@@ -79,9 +79,9 @@ void sr_handlepacket(struct sr_instance* sr,
   printf("*** -> Received packet of length %d \n",len);
     struct sr_ethertype_hdr_t *eth_hdr = (sr_ethernet_hdr_t *) packet;
     
-  if (ethertype(packet) == sr_ethertype.ethertype_ip) {
+  if (ethertype(packet) == ethertype_ip) {
       printf("ip packet\n");
-  } else if (ethertype(packet) == sr_ethertype.ethertype_arp) {
+  } else if (ethertype(packet) == ethertype_arp) {
       printf("arp packet\n");
   }
 
