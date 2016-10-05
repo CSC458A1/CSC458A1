@@ -82,35 +82,29 @@ void sr_handlepacket(struct sr_instance* sr,
     struct sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)packet;
     struct sr_ip_hdr_t *ip_hdr = (sr_arp_hdr_t *)packet;
     
-    switch(ethertype(packet)) {
-            case: ethertype_ip
-                print_hdr_ip(packet);
-                struct sr_arpentry *entry = search_arpcache(sr, nthol(ip_hdr->ip_dst));
-                if (entry == -1) {
-                    printf("ip not in cache, sending arp requests\n");
-                } else {
-                    printf("ip in cache, sending result back to origin\n");
-                
-            case: ethertype_arp
-                print_hdr_arp(packet);
-                //Look in arp table
-                struct sr_arpentry *entry = search_arp_cache(sr, ntohl(arp_hdr->ar_tip));
-                if (entry == -1) {
-                    printf("ip not in cache, sending arp requests\n");
-                } else {
-                    printf("ip in cache, sending result back to origin\n");
-                    //forward packet back to origin
-                }
-                //send arp request to all clients
-                
-            
-        default:
-            return;
-    }
+    if (ethertype(packet) == ethertype_ip) {
+        print_hdr_ip(packet);
+        struct sr_arpentry *entry = search_arpcache(sr, nthol(ip_hdr->ip_dst));
+        if (entry == -1) {
+            printf("ip not in cache, sending arp requests\n");
+        } else {
+        printf("ip in cache, sending result back to origin\n");
+    } else if (ethertype(packet) == ethertype_arp) {
+            print_hdr_arp(packet);
+            //Look in arp table
+            struct sr_arpentry *entry = search_arp_cache(sr, ntohl(arp_hdr->ar_tip));
+            if (entry == -1) {
+                printf("ip not in cache, sending arp requests\n");
+            } else {
+                printf("ip in cache, sending result back to origin\n");
+            //forward packet back to origin
+            }
+            //send arp request to all clients
+        }
 
 }/* end sr_ForwardPacket */
 
-*sr_arpentry search_arp_cache(struct sr_instance* sr, uint32_t ip) {
+struct *sr_arpentry search_arp_cache(struct sr_instance* sr, uint32_t ip) {
     int i;
     for (i = 0; i < SR_ARPCACHE_SZ; i++) {
         struct sr_arpentry *entry = sr->cache.entries[i];
