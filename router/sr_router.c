@@ -72,20 +72,21 @@ void sr_handlepacket(struct sr_instance* sr,
         char* interface/* lent */)
 {
   /* REQUIRES */
-  assert(sr);
-  assert(packet);
-  assert(interface);
+    assert(sr);
+    assert(packet);
+    assert(interface);
 
-  printf("*** -> Received packet of length %d \n",len);
+    printf("*** -> Received packet of length %d \n",len);
+    
     struct sr_ethertype_hdr_t *eth_hdr = (sr_ethernet_hdr_t *) packet;
     
-  if (ethertype(packet) == ethertype_ip) {
-      printf("ip packet\n");
-  } else if (ethertype(packet) == ethertype_arp) {
-      printf("arp packet\n");
-  }
-
-  /* fill in code here */
+    if (ethertype(packet) == ethertype_ip) {
+        printf("ip packet\n");
+        print_hdr_ip(packet);
+    } else if (ethertype(packet) == ethertype_arp) {
+        printf("arp packet\n");
+        print_hdr_arp(packet);
+    }
 
 }/* end sr_ForwardPacket */
 
