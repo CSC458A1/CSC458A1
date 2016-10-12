@@ -29,14 +29,11 @@
  * Initialize the routing subsystem
  *
  *---------------------------------------------------------------------*/
-struct sr_ip_hdr *get_ip_header(uint8_t *buf){
-	return (struct sr_ip_hdr *)(buf + sizeof(struct sr_ethernet_hdr));
-}
-
 
 struct sr_icmp_hdr *get_icmp_header(struct sr_ip_hdr *ip_hdr){
 	return (struct sr_icmp_hdr *)((uint8_t *)ip_hdr + ip_hdr->ip_hl * 4);
 }
+
 void sr_init(struct sr_instance* sr)
 {
     /* REQUIRES */
@@ -135,8 +132,7 @@ void process_ip_pkt(struct sr_instance* sr,
 	enum sr_ip_protocol ip_ser = ip_protocol_icmp;
 	struct sr_if* if_walker = 0;
 	
-	struct sr_ip_hdr *ip_hdr;
-	ip_hdr = get_ip_header(packet);
+	sr_ip_hdr_t *ip_hdr = (sr_arp_hdr_t *)(packet);
 	printf("a\n");
 	if(sr_contains_interface(sr, ip_hdr->ip_dst)){
 		if(ip_hdr->ip_p == ip_protocol_icmp){
