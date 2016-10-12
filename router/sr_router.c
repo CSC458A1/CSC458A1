@@ -29,13 +29,11 @@
  * Initialize the routing subsystem
  *
  *---------------------------------------------------------------------*/
-struct sr_ip_hdr *get_ip_header(uint8_t *buf){
-	return (struct sr_ip_hdr *)(buf + sizeof(struct sr_ethernet_hdr));
-}
 
 struct sr_icmp_hdr *get_icmp_header(struct sr_ip_hdr *ip_hdr){
 	return (struct sr_icmp_hdr *)((uint8_t *)ip_hdr + ip_hdr->ip_hl * 4);
 }
+
 void sr_init(struct sr_instance* sr)
 {
     /* REQUIRES */
@@ -78,34 +76,25 @@ void sr_handlepacket(struct sr_instance* sr,
         char* interface/* lent */)
 {
   /* REQUIRES */
+
 	assert(sr);
 	assert(packet);
 	assert(interface);
 
 	printf("*** -> Received packet of length %d \n",len);
+
   
 	print_hdr_eth(packet);
   
-	if(ethertype(packet) != ethertype_arp){
-
-		sr_ip_hdr_t *iphr = get_ip_header(packet);
-		/*print_hdr_ip(iphr);*/
-
-		printf("s\n");
-		process_ip_pkt(sr, packet, len, interface);	
-
-  	}else{
-		process_arp_pkt(sr, packet, len, interface);
-	}
-	
-
-
-  /*printf("*** -> Received packet of source %u \n",ethernet_header->ether_shost);*/
-
-  /* fill in code here */
-
+    
+    if (ethertype(packet) == ethertype_ip) {
+        handle_ip_packet(sr, packet, len, interface);
+    } else if (ethertype(packet) == ethertype_arp) {
+        handle_arp_packet(sr, packet, len, interface);        
+    }
 }/* end sr_ForwardPacket */
 
+<<<<<<< HEAD
 void process_arp_packet(struct sr_instance* sr,
         uint8_t * packet/* lent */,
         unsigned int len,
@@ -115,6 +104,8 @@ void process_arp_packet(struct sr_instance* sr,
 }
 
 
+=======
+>>>>>>> 21f4708cf77ac627358e5af8cb6ce0c6b23c0813
 void process_ip_pkt(struct sr_instance* sr,
         uint8_t * packet/* lent */,
         unsigned int len,
@@ -123,8 +114,7 @@ void process_ip_pkt(struct sr_instance* sr,
 	enum sr_ip_protocol ip_ser = ip_protocol_icmp;
 	struct sr_if* if_walker = 0;
 	
-	struct sr_ip_hdr *ip_hdr;
-	ip_hdr = get_ip_header(packet);
+	sr_ip_hdr_t *ip_hdr = (sr_arp_hdr_t *)(packet);
 	printf("a\n");
 	if(sr_contains_interface(sr, ip_hdr->ip_dst)){
 		if(ip_hdr->ip_p == ip_protocol_icmp){
@@ -169,6 +159,48 @@ void sr_send_icmp_pkt(struct sr_instance* sr, uint8_t *packet, uint8_t icmp_type
 	}
 }
 
+void handle_ip_packet(struct sr_instance* sr,
+        uint8_t * packet/* lent */,
+        unsigned int len,
+        char* interface/* lent */){
+    sr_ip_hdr_t *ip_hdr = (sr_arp_hdr_t *)(packet);
+    print_hdr_ip(packet);
+    sr_arpentry_t *entry = sr_arpcache_lookup(&(sr->cache), ip_hdr->ip_dst);
+    if (entry == NULL) {
+        printf("ip not in cache, sending arp requests\n");
+        sr_arpcache_queuereq(&(sr->cache), ip_hdr->ip_dst, packet, len, interface);
+    } else {
+        printf("ip in cache, forwarding packet\n");
+        sr_send_packet(sr, packet, len, entry->mac);
+    }
+}
+
+void handle_arp_packet(struct sr_instance* sr,
+        uint8_t * packet/* lent */,
+        unsigned int len,
+        char* interface/* lent */){
+    print_hdr_arp(packet);
+    sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(packet);
+        /* Look in arp table */
+    sr_arpentry_t *entry = sr_arpcache_lookup(&(sr->cache), arp_hdr->ar_tip);
+    if (arp_hdr->ar_op == arp_op_reply) {
+        sr_if_t *iface = sr_get_interface(sr, interface);
+        if (arp_hdr->ar_tip == iface->ip) {
+            sr_arpcache_insert(&(sr->cache), interface, arp_hdr->ar_tip);
+        }
+    } else {
+        if (entry == NULL) {
+            printf("ip not in cache, sending arp requests\n");
+                /* send arp request to all clients */
+            sr_arpcache_queuereq(&(sr->cache), arp_hdr->ar_sip, packet, len, interface);
+        } else {
+            printf("ip in cache, sending result back to origin\n");
+            /* forward packet back to origin */
+            /* sr_send_packet(sr, packet, len, arp_hdr->ar_sha); */
+        }
+    }
+}
+
 void process_icmp_packet(struct sr_instance* sr, struct sr_ip_hdr_t *ip_hdr)
 {
 	struct sr_icmp_hdr *icmp_hdr;
@@ -206,4 +238,26 @@ int is_icmp_pkt_valid(struct sr_ip_hdr *ip_hdr){
 }
 
 
-
+/*lookup rtable and return interface*/
+char* sr_rtable_lookup(struct sr_instance *sr, uint32_t destIP){
+    struct sr_rt* rTable = sr->routing_table;
+    char* rInterface = NULL;
+    uint32_t rMask = 0;
+    while(rTable)
+    {
+        uint32_t curMask = rTable->mask.s_addr;
+        uint32_t curDest = rTable->dest.s_addr;
+        if(rMask == 0 || curMask > rMask)
+        {
+            /*Check with Longest Prefix Match Algorithm*/
+            uint32_t newDestIP = (destIP & curMask);
+            if(newDestIP == curDest)
+            {
+                rMask = curMask;
+                rInterface = rTable->interface;
+            } 
+        }
+        rTable = rTable->next;
+    }
+    return rInterface;
+}
