@@ -121,7 +121,7 @@ void sr_handlepacket(struct sr_instance* sr,
         } else {
             printf("ip in cache, sending result back to origin\n");
             /* forward packet back to origin */
-            sr_send_packet(sr, packet, len, arp_hdr->ar_sha);
+            /* sr_send_packet(sr, packet, len, arp_hdr->ar_sha); */
         }
     }
 }/* end sr_ForwardPacket */
