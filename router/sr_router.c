@@ -213,3 +213,28 @@ int is_icmp_pkt_valid(struct sr_ip_hdr *ip_hdr){
 
 	
 }
+
+
+/*lookup rtable and return interface*/
+char* sr_rtable_lookup(struct sr_instance *sr, uint32_t destIP){
+    struct sr_rt* rTable = sr->routing_table;
+    char* rInterface = NULL;
+    uint32_t rMask = 0;
+    while(rTable)
+    {
+        uint32_t curMask = rTable->mask.s_addr;
+        uint32_t curDest = rTable->dest.s_addr;
+        if(rMask == 0 || curMask > rMask)
+        {
+            /*Check with Longest Prefix Match Algorithm*/
+            uint32_t newDestIP = (destIP & curMask);
+            if(newDestIP == curDest)
+            {
+                rMask = curMask;
+                rInterface = rTable->interface;
+            } 
+        }
+        rTable = rTable->next;
+    }
+    return rInterface;
+}
