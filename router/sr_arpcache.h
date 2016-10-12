@@ -86,7 +86,7 @@ struct sr_arpentry {
     uint32_t ip;                /* IP addr in network byte order */
     time_t added;         
     int valid;
-};
+}; typedef struct sr_arpentry sr_arpentry_t;
 
 struct sr_arpreq {
     uint32_t ip;
