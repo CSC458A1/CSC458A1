@@ -45,7 +45,16 @@
 #define IP_MAXPACKET 65535
 #endif
 
-
+#define ICMP_IP_HDR_LEN 5
+#define ICMP_IP_HDR_LEN_BYTES ICMP_IP_HDR_LEN * 4
+#define ICMP_COPIED_DATAGRAM_DATA_LEN 8
+#define ICMP_ECHO_REQUEST_CODE 8 
+#define ICMP_ECHO_REPLY_CODE 0
+#define ICMP_UNREACHABLE_TYPE 3
+#define ICMP_HOST_CODE 1
+#define ICMP_NET_CODE 0
+#define ICMP_PORT_CODE 3
+#define ICMP_TIME_EXCEEDED_TYPE 11
 
 /* FIXME
  * ohh how lame .. how very, very lame... how can I ever go out in public
