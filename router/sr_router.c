@@ -83,18 +83,12 @@ void sr_handlepacket(struct sr_instance* sr,
   assert(interface);
 
   printf("*** -> Received packet of length %d \n",len);
-
-
-  struct sr_ethernet_hdr *ehdr;
-  ehdr = (struct sr_ethernet_hdr *)packet;
-
-  enum sr_ethertype ether_type_ip = ethertype_ip;
   
   print_hdr_eth(packet);
   
-  if(ntohs(ehdr->ether_type) != ethertype_arp){
+  if(ethertype(packet) != ethertype_arp){
 
-	sr_ip_hdr_t *iphr = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
+	sr_ip_hdr_t *iphr = get_ip_header(packet);
 	/*print_hdr_ip(iphr);*/
 
 	printf("s\n");
