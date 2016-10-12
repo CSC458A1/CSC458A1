@@ -112,15 +112,15 @@ void sr_handlepacket(struct sr_instance* sr,
         }
     } else if (ethertype(packet) == ethertype_arp) {
         print_hdr_arp(packet);
-        //Look in arp table
+        /* Look in arp table */
         struct sr_arpentry *entry = sr_arpcache_lookup(sr->cache, arp_hdr->ar_tip);
         if (entry == NULL) {
             printf("ip not in cache, sending arp requests\n");
-            //send arp request to all clients
+            /* send arp request to all clients */
             sr_arpcache_queuereq(sr->cache, entry->ip, packet, len, interface);
         } else {
             printf("ip in cache, sending result back to origin\n");
-            //forward packet back to origin
+            /* forward packet back to origin */
             sr_send_packet(sr, packet, len, arp_hdr->ar_sha);
         }
     }
