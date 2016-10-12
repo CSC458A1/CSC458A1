@@ -95,32 +95,11 @@ void sr_handlepacket(struct sr_instance* sr,
     printf("*** -> Received packet of length %d \n",len);
     
     sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)(packet);
-    sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(packet);
-    sr_ip_hdr_t *ip_hdr = (sr_arp_hdr_t *)(packet);
     
     if (ethertype(packet) == ethertype_ip) {
-        print_hdr_ip(packet);
-        sr_arpentry_t *entry = sr_arpcache_lookup(&(sr->cache), ip_hdr->ip_dst);
-        if (entry == NULL) {
-            printf("ip not in cache, sending arp requests\n");
-            sr_arpcache_queuereq(&(sr->cache), ip_hdr->ip_dst, packet, len, interface);
-        } else {
-            printf("ip in cache, forwarding packet\n");
-            sr_send_packet(sr, packet, len, entry->mac);
-        }
+        handle_ip_packet(sr, packet, len, interface);
     } else if (ethertype(packet) == ethertype_arp) {
-        print_hdr_arp(packet);
-        /* Look in arp table */
-        sr_arpentry_t *entry = sr_arpcache_lookup(&(sr->cache), arp_hdr->ar_tip);
-        if (entry == NULL) {
-            printf("ip not in cache, sending arp requests\n");
-            /* send arp request to all clients */
-            sr_arpcache_queuereq(&(sr->cache), arp_hdr->ar_sip, packet, len, interface);
-        } else {
-            printf("ip in cache, sending result back to origin\n");
-            /* forward packet back to origin */
-            /* sr_send_packet(sr, packet, len, arp_hdr->ar_sha); */
-        }
+        handle_arp_packet(sr, packet, len, interface);        
     }
 }/* end sr_ForwardPacket */
 
@@ -175,6 +154,48 @@ void sr_send_icmp_pkt(struct sr_instance* sr, uint8_t *packet, uint8_t icmp_type
 		icmp_hdr = get_icmp_header((struct sr_ip_hdr_t *)new_pkt);
 		icmp_hdr->icmp_sum = cksum(icmp_hdr, new_pkt_len - ICMP_IP_HDR_LEN);
 	}
+}
+
+void handle_ip_packet(struct sr_instance* sr,
+        uint8_t * packet/* lent */,
+        unsigned int len,
+        char* interface/* lent */){
+    sr_ip_hdr_t *ip_hdr = (sr_arp_hdr_t *)(packet);
+    print_hdr_ip(packet);
+    sr_arpentry_t *entry = sr_arpcache_lookup(&(sr->cache), ip_hdr->ip_dst);
+    if (entry == NULL) {
+        printf("ip not in cache, sending arp requests\n");
+        sr_arpcache_queuereq(&(sr->cache), ip_hdr->ip_dst, packet, len, interface);
+    } else {
+        printf("ip in cache, forwarding packet\n");
+        sr_send_packet(sr, packet, len, entry->mac);
+    }
+}
+
+void handle_arp_packet(struct sr_instance* sr,
+        uint8_t * packet/* lent */,
+        unsigned int len,
+        char* interface/* lent */){
+    print_hdr_arp(packet);
+    sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(packet);
+        /* Look in arp table */
+    sr_arpentry_t *entry = sr_arpcache_lookup(&(sr->cache), arp_hdr->ar_tip);
+    if (arp_hdr->ar_op == arp_op_reply) {
+        sr_if_t *iface = sr_get_interface(sr, interface);
+        if (arp_hdr->ar_tip == iface->ip) {
+            sr_arpcache_insert(&(sr->cache), interface, arp_hdr->ar_tip);
+        }
+    } else {
+        if (entry == NULL) {
+            printf("ip not in cache, sending arp requests\n");
+                /* send arp request to all clients */
+            sr_arpcache_queuereq(&(sr->cache), arp_hdr->ar_sip, packet, len, interface);
+        } else {
+            printf("ip in cache, sending result back to origin\n");
+            /* forward packet back to origin */
+            /* sr_send_packet(sr, packet, len, arp_hdr->ar_sha); */
+        }
+    }
 }
 
 void process_icmp_packet(struct sr_instance* sr, struct sr_ip_hdr_t *ip_hdr)
