@@ -183,7 +183,7 @@ void handle_arp_packet(struct sr_instance* sr,
     if (arp_hdr->ar_op == arp_op_reply) {
         sr_if_t *iface = sr_get_interface(sr, interface);
         if (arp_hdr->ar_tip == iface->ip) {
-            sr_arpcache_insert(&(sr->cache), interface, ar_hdr->tip);
+            sr_arpcache_insert(&(sr->cache), interface, arp_hdr->ar_tip);
         }
     } else {
         if (entry == NULL) {
