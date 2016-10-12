@@ -97,7 +97,7 @@ void sr_handlepacket(struct sr_instance* sr,
 
     printf("*** -> Received packet of length %d \n",len);
     
-    sr_ethertype_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)(packet);
+    sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)(packet);
     sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(packet);
     sr_ip_hdr_t *ip_hdr = (sr_arp_hdr_t *)(packet);
     
