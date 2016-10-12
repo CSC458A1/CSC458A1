@@ -103,10 +103,10 @@ void sr_handlepacket(struct sr_instance* sr,
     
     if (ethertype(packet) == ethertype_ip) {
         print_hdr_ip(packet);
-        sr_arpentry *entry = sr_arpcache_lookup(sr->cache, ip_hdr->ip_dst);
+        sr_arpentry *entry = sr_arpcache_lookup(&(sr->cache), ip_hdr->ip_dst);
         if (entry == NULL) {
             printf("ip not in cache, sending arp requests\n");
-            sr_arpcache_queuereq(sr.cache, ip_hdr->ip_dst, packet, len, interface);
+            sr_arpcache_queuereq(&(sr->cache), ip_hdr->ip_dst, packet, len, interface);
         } else {
             printf("ip in cache, forwarding packet\n");
             sr_send_packet(sr, packet, len, entry->mac);
@@ -114,11 +114,11 @@ void sr_handlepacket(struct sr_instance* sr,
     } else if (ethertype(packet) == ethertype_arp) {
         print_hdr_arp(packet);
         /* Look in arp table */
-        sr_arpentry *entry = sr_arpcache_lookup(sr->cache, arp_hdr->ar_tip);
+        sr_arpentry *entry = sr_arpcache_lookup(&(sr->cache), arp_hdr->ar_tip);
         if (entry == NULL) {
             printf("ip not in cache, sending arp requests\n");
             /* send arp request to all clients */
-            sr_arpcache_queuereq(sr->cache, arp_hdr->ip_dst, packet, len, interface);
+            sr_arpcache_queuereq(&(sr->cache), arp_hdr->ar_sip, packet, len, interface);
         } else {
             printf("ip in cache, sending result back to origin\n");
             /* forward packet back to origin */
