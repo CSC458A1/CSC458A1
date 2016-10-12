@@ -103,7 +103,7 @@ void sr_handlepacket(struct sr_instance* sr,
     
     if (ethertype(packet) == ethertype_ip) {
         print_hdr_ip(packet);
-        sr_arpentry *entry = sr_arpcache_lookup(&(sr->cache), ip_hdr->ip_dst);
+        sr_arpentry_t *entry = sr_arpcache_lookup(&(sr->cache), ip_hdr->ip_dst);
         if (entry == NULL) {
             printf("ip not in cache, sending arp requests\n");
             sr_arpcache_queuereq(&(sr->cache), ip_hdr->ip_dst, packet, len, interface);
@@ -114,7 +114,7 @@ void sr_handlepacket(struct sr_instance* sr,
     } else if (ethertype(packet) == ethertype_arp) {
         print_hdr_arp(packet);
         /* Look in arp table */
-        sr_arpentry *entry = sr_arpcache_lookup(&(sr->cache), arp_hdr->ar_tip);
+        sr_arpentry_t *entry = sr_arpcache_lookup(&(sr->cache), arp_hdr->ar_tip);
         if (entry == NULL) {
             printf("ip not in cache, sending arp requests\n");
             /* send arp request to all clients */
