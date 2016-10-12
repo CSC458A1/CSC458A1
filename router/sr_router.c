@@ -33,6 +33,7 @@ struct sr_ip_hdr *get_ip_header(uint8_t *buf){
 	return (struct sr_ip_hdr *)(buf + sizeof(struct sr_ethernet_hdr));
 }
 
+
 struct sr_icmp_hdr *get_icmp_header(struct sr_ip_hdr *ip_hdr){
 	return (struct sr_icmp_hdr *)((uint8_t *)ip_hdr + ip_hdr->ip_hl * 4);
 }
@@ -96,9 +97,9 @@ void sr_handlepacket(struct sr_instance* sr,
 
     printf("*** -> Received packet of length %d \n",len);
     
-    struct sr_ethertype_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)packet;
-    struct sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)packet;
-    struct sr_ip_hdr_t *ip_hdr = (sr_arp_hdr_t *)packet;
+    sr_ethertype_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)(packet);
+    sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(packet);
+    sr_ip_hdr_t *ip_hdr = (sr_arp_hdr_t *)(packet);
     
     if (ethertype(packet) == ethertype_ip) {
         print_hdr_ip(packet);
