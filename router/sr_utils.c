@@ -20,6 +20,7 @@ uint16_t cksum (const void *_data, int len) {
 }
 
 
+
 uint16_t ethertype(uint8_t *buf) {
   sr_ethernet_hdr_t *ehdr = (sr_ethernet_hdr_t *)buf;
   return ntohs(ehdr->ether_type);
@@ -30,6 +31,17 @@ uint8_t ip_protocol(uint8_t *buf) {
   return iphdr->ip_p;
 }
 
+struct sr_icmp_hdr *get_icmp_header(struct sr_ip_hdr *ip_hdr){
+	return (struct sr_icmp_hdr *)((uint8_t *)ip_hdr + ip_hdr->ip_hl * 4);
+}
+
+struct sr_ip_hdr *get_ip_header(uint8_t *buf){
+	return (struct sr_ip_hdr *)(buf + sizeof(struct sr_ethernet_hdr));
+}
+
+struct sr_arp_hdr *get_arp_header(uint8_t *buf){
+	return (struct sr_arp_hdr *)(buf + sizeof(struct sr_ethernet_hdr));
+}
 
 /* Prints out formatted Ethernet address, e.g. 00:11:22:33:44:55 */
 void print_addr_eth(uint8_t *addr) {

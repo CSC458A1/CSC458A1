@@ -210,3 +210,21 @@ int sr_contains_interface(struct sr_instance* sr, uint32_t dest_ip)
 	}
 	return 0;
 }
+
+struct sr_if* sr_get_interface_by_dest_ip(struct sr_instance* sr, uint32_t dest_ip)
+{
+	struct sr_if* if_walker = 0;
+
+    /* -- REQUIRES -- */
+
+    assert(sr);
+
+    if_walker = sr->if_list;
+	while(if_walker){
+		if(if_walker->ip == dest_ip){
+			return if_walker;		
+		}
+		if_walker = if_walker->next;	
+	}
+	return 0;
+}
