@@ -76,25 +76,16 @@ void sr_handlepacket(struct sr_instance* sr,
         char* interface/* lent */)
 {
   /* REQUIRES */
-    assert(sr);
-    assert(packet);
-    assert(interface);
+
+	assert(sr);
+	assert(packet);
+	assert(interface);
+
+	printf("*** -> Received packet of length %d \n",len);
+
   
-  print_hdr_eth(packet);
+	print_hdr_eth(packet);
   
-  /* if(ethertype(packet) != ethertype_arp){
-
-	sr_ip_hdr_t *iphr = get_ip_header(packet);
- 
-
-	printf("s\n");
-	process_ip_pkt(sr, packet, len, interface);	
-
-  } */
-
-    printf("*** -> Received packet of length %d \n",len);
-    
-    sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t *)(packet);
     
     if (ethertype(packet) == ethertype_ip) {
         handle_ip_packet(sr, packet, len, interface);
@@ -103,6 +94,18 @@ void sr_handlepacket(struct sr_instance* sr,
     }
 }/* end sr_ForwardPacket */
 
+<<<<<<< HEAD
+void process_arp_packet(struct sr_instance* sr,
+        uint8_t * packet/* lent */,
+        unsigned int len,
+        char* interface/* lent */)
+{
+	
+}
+
+
+=======
+>>>>>>> 21f4708cf77ac627358e5af8cb6ce0c6b23c0813
 void process_ip_pkt(struct sr_instance* sr,
         uint8_t * packet/* lent */,
         unsigned int len,
@@ -233,7 +236,6 @@ int is_icmp_pkt_valid(struct sr_ip_hdr *ip_hdr){
 		return 0;
 	}
 	return 1;
-
 	
 }
 
