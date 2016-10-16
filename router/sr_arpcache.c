@@ -24,7 +24,7 @@ void handle_arpreq(struct sr_arpreq *req, struct sr_instance *sr) {
               /* send icmp host unreachable to source addr of all pkts waiting
                 // on this request*/
                 fprintf(stderr,"The arp request with ip: %d has expired, Sent ICMP\n", req->ip);
-	            print_addr_ip_int(req->ip);
+	            /*print_addr_ip_int(req->ip);*/
                 struct sr_packet *pkts;	
                for(pkts=req->packets; pkts != NULL; pkts = pkts->next){
                              /*sr_send_icmp_pkt(sr,pkts->buf,pkts->len,3,1,pkts->iface)*/
@@ -38,12 +38,13 @@ void handle_arpreq(struct sr_arpreq *req, struct sr_instance *sr) {
                //use forward function here*/ 
                req->sent = now;
                req->times_sent++ ;
-               char* rInterface = sr_rtable_lookup(sr, req->ip);
-               if(rInterface == NULL){       
+               struct sr_if *destIPInterface;
+			   destIPInterface = sr_get_interface(sr, req->packets->iface);
+               if(destIPInterface == NULL){       
                             fprintf(stderr,"Fail due to empty rInterface in sr_arpcache\n");
                }
                else{
-				    struct sr_if* destIPInterface = sr_get_interface(sr, rInterface);
+				    /*struct sr_if* destIPInterface = sr_get_interface(sr, rInterface);*/
 				    if(!destIPInterface){
                     
                      fprintf(stderr,"Fail due to empty destIPInterface in sr_arpcache\n");
@@ -123,7 +124,7 @@ void sr_arpcache_sweepreqs(struct sr_instance *sr) {
 		  handle_arpreq(req,sr);
 		  
 	}	       
-    printf("************************Arpcache_Sweepreqs ends**********************\n") ;             
+   /* printf("************************Arpcache_Sweepreqs ends**********************\n") ;*/             
 }
 
 

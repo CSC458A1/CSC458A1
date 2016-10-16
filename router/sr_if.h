@@ -50,6 +50,7 @@ void sr_add_interface(struct sr_instance*, const char*);
 void sr_set_ether_addr(struct sr_instance*, const unsigned char*);
 void sr_set_ether_ip(struct sr_instance*, uint32_t ip_nbo);
 void sr_print_if_list(struct sr_instance*);
+int sr_contains_interface(struct sr_instance* sr, uint32_t dest_ip);
 void sr_print_if(struct sr_if*);
 
 #endif /* --  sr_INTERFACE_H -- */
