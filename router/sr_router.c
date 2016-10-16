@@ -326,6 +326,32 @@ void process_arp_packet(struct sr_instance* sr,
         unsigned int len,
         char* incoming_interface/* lent */)
 {
+    print_hdr_arp(packet);
+    sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(packet);
+        /* Look in arp table */
+    sr_arpentry_t *entry = sr_arpcache_lookup(&(sr->cache), arp_hdr->ar_tip);
+    if (arp_hdr->ar_op == arp_op_reply) {
+        printf("arp reply recieved\n");
+        sr_if_t *iface = sr_get_interface(sr, interface);
+        if (arp_hdr->ar_tip == iface->ip) {
+            printf("arp reply matches interface, adding to cache\n");
+            sr_arpcache_insert(&(sr->cache), interface, arp_hdr->ar_tip);
+        }
+    } else {
+        if (entry == NULL) {
+            printf("ip not in cache, sending arp requests\n");
+                /* send arp request to all clients */
+            sr_arpcache_queuereq(&(sr->cache), arp_hdr->ar_sip, packet, len, interface);
+        } else {
+            printf("ip in cache, sending result back to origin\n");
+            /* forward packet back to origin */
+            /* sr_send_packet(sr, packet, len, arp_hdr->ar_sha); */
+        }
+    }
+}
+
+void process_icmp_packet(struct sr_instance* sr, struct sr_ip_hdr_t *ip_hdr)
+{
     print_hdr_arp((uint8_t *)get_arp_header(packet));
     struct sr_arp_hdr *arp_hdr;
 	struct sr_arpreq *arp_req;
