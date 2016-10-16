@@ -24,7 +24,7 @@ void handle_arpreq(struct sr_arpreq *req, struct sr_instance *sr) {
               /* send icmp host unreachable to source addr of all pkts waiting
                 // on this request*/
                 fprintf(stderr,"The arp request with ip: %d has expired, Sent ICMP\n", req->ip);
-	            print_addr_ip_int(req->ip);
+	            /*print_addr_ip_int(req->ip);*/
                 struct sr_packet *pkts;	
                for(pkts=req->packets; pkts != NULL; pkts = pkts->next){
                              /*sr_send_icmp_pkt(sr,pkts->buf,pkts->len,3,1,pkts->iface)*/
