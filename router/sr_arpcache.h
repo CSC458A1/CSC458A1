@@ -86,7 +86,7 @@ struct sr_arpentry {
     uint32_t ip;                /* IP addr in network byte order */
     time_t added;         
     int valid;
-};
+}; typedef struct sr_arpentry sr_arpentry_t;
 
 struct sr_arpreq {
     uint32_t ip;
@@ -146,5 +146,7 @@ void sr_arpcache_dump(struct sr_arpcache *cache);
 int   sr_arpcache_init(struct sr_arpcache *cache);
 int   sr_arpcache_destroy(struct sr_arpcache *cache);
 void *sr_arpcache_timeout(void *cache_ptr);
+void handle_arpreq(struct sr_arpreq *req, struct sr_instance *sr);
+void sr_arpcache_sweepreqs(struct sr_instance *sr);
 
 #endif
