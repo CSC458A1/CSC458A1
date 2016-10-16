@@ -435,7 +435,7 @@ void process_arp_packet(struct sr_instance* sr,
 				memcpy(new_ethernet_pkt->ether_dhost, arp_hdr->ar_sha, ETHER_ADDR_LEN);	
 				printf("sending packet with updated mac addr\n");
 				print_hdr_eth((uint8_t *)new_ethernet_pkt);
-				print_hdr_ip((uint8_t *)get_ip_header(new_ethernet_pkt));
+				print_hdr_ip((uint8_t *)get_ip_header((uint8_t *)new_ethernet_pkt));
 				sr_send_packet(sr, packet->buf, packet->len, packet->iface);	
 				packet = packet->next;
 			}
