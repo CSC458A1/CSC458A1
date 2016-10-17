@@ -366,7 +366,7 @@ void process_arp_packet(struct sr_instance* sr,
     sr_arpentry_t *entry = sr_arpcache_lookup(&(sr->cache), arp_hdr->ar_tip);
     if (arp_hdr->ar_op == arp_op_reply) {
         printf("arp reply recieved\n");
-        sr_if_t *iface = sr_get_interface(sr, interface);
+        sr_if_t *iface = sr_get_interface(sr, incoming_interface);
         if (arp_hdr->ar_tip == iface->ip) {
             printf("arp reply matches interface, adding to cache\n");
             sr_arpcache_insert(&(sr->cache), incoming_interface, arp_hdr->ar_tip);
@@ -375,7 +375,7 @@ void process_arp_packet(struct sr_instance* sr,
         if (entry == NULL) {
             printf("ip not in cache, sending arp requests\n");
                 /* send arp request to all clients */
-            sr_arpcache_queuereq(&(sr->cache), arp_hdr->ar_sip, packet, len, interface);
+            sr_arpcache_queuereq(&(sr->cache), arp_hdr->ar_sip, packet, len, incoming_interface);
         } else {
             printf("ip in cache, sending result back to origin\n");
             /* forward packet back to origin */
