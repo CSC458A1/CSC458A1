@@ -17,67 +17,61 @@
   See the comments in the header file for an idea of what it should look like.
 */
 void handle_arpreq(struct sr_arpreq *req, struct sr_instance *sr) {
-	  time_t now ;
-	  ctime(&now); 
-	  if (difftime(now, req->sent) > 1.0) {
-           if (req->times_sent >= 5) {
-              /* send icmp host unreachable to source addr of all pkts waiting
-                // on this request*/
-                fprintf(stderr,"The arp request with ip: %d has expired, Sent ICMP\n", req->ip);
-	            print_addr_ip_int(req->ip);
-                struct sr_packet *pkts;	
-               for(pkts=req->packets; pkts != NULL; pkts = pkts->next){
-                             /*sr_send_icmp_pkt(sr,pkts->buf,pkts->len,3,1,pkts->iface)*/
-                              printf("************************send ICMP port unreachable **********************\n"); 
-                 }
-               sr_arpreq_destroy(&sr->cache,req);
+	time_t now ;
+	ctime(&now); 
+	if (difftime(now, req->sent) > 1.0) {
+		if (req->times_sent >= 5) {
+			/* send icmp host unreachable to source addr of all pkts waiting on this request*/
+			fprintf(stderr,"The arp request with ip: %d has expired, Sent ICMP\n", req->ip);
+			/*print_addr_ip_int(req->ip);*/
+			struct sr_packet *pkts;	
+			for(pkts=req->packets; pkts != NULL; pkts = pkts->next){
+				printf("************************send ICMP port unreachable **********************\n"); 
+				send_icmp_pkt(sr, pkts->len, pkts->buf, ICMP_UNREACHABLE_TYPE, ICMP_HOST_CODE, 
+				pkts->iface);
+            }
+			sr_arpreq_destroy(&sr->cache,req);
               
-           }    
-           else{
-               /*send an arp request                
-               //use forward function here*/ 
-               req->sent = now;
-               req->times_sent++ ;
-               char* rInterface = sr_rtable_lookup(sr, req->ip);
-               if(rInterface == NULL){       
-                            fprintf(stderr,"Fail due to empty rInterface in sr_arpcache\n");
-               }
-               else{
-				    struct sr_if* destIPInterface = sr_get_interface(sr, rInterface);
-				    if(!destIPInterface){
-                    
-                     fprintf(stderr,"Fail due to empty destIPInterface in sr_arpcache\n");
-                    }
-                    else{
-				  	 	uint8_t *arpRequestPacket = (uint8_t *)malloc(42);
-                         /*Set the ARP packet's ethernet header*/
-                         sr_ethernet_hdr_t *ehdr   = (sr_ethernet_hdr_t *) arpRequestPacket;
-                         uint8_t broadcastAddr[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
-                         memcpy(ehdr->ether_dhost, broadcastAddr, ETHER_ADDR_LEN);
-                         memcpy(ehdr->ether_shost, destIPInterface->addr, ETHER_ADDR_LEN);
-                         ehdr->ether_type = htons(2054);
-                         /*Set the ARP packet's ARP header*/
-                         sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(arpRequestPacket + sizeof(sr_ethernet_hdr_t));
-                         arp_hdr->ar_hrd = htons(1);
-                         arp_hdr->ar_pro = htons(2048);
-                         arp_hdr->ar_hln = 6;
-                         arp_hdr->ar_pln = 4;
-                         arp_hdr->ar_op = htons(1);
-                         memcpy(arp_hdr->ar_sha, destIPInterface->addr, ETHER_ADDR_LEN);
-                         arp_hdr->ar_sip = destIPInterface->ip;
-                         uint8_t broadcastArpAddr[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00}; 
-                         memcpy(arp_hdr->ar_tha, broadcastArpAddr, ETHER_ADDR_LEN);
-                         arp_hdr->ar_tip = req->ip;
-                         sr_send_packet(sr, arpRequestPacket, 42, destIPInterface->name);
-                         printf("************************broadcast arp requests **********************\n");
-                         free(arpRequestPacket);
-	               }
-	  
-	           }
-  
-                          
-                    }
-			   }	    
+		}    
+		else{
+			/*send an arp request use forward function here*/ 
+			req->sent = now;
+			req->times_sent++ ;
+			struct sr_if *destIPInterface;
+			destIPInterface = sr_get_interface(sr, req->packets->iface);	
+			if(destIPInterface == NULL){       
+				fprintf(stderr,"Fail due to empty rInterface in sr_arpcache\n");
+			}
+			else{
+				unsigned int len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t);
+				uint8_t *arpRequestPacket = (uint8_t *)malloc(len);
+				/*Set the ARP packet's ethernet header*/
+				sr_ethernet_hdr_t *ehdr   = (sr_ethernet_hdr_t *) arpRequestPacket;
+				uint8_t broadcastAddr[ETHER_ADDR_LEN] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+				memcpy(ehdr->ether_dhost, broadcastAddr, ETHER_ADDR_LEN);
+				memcpy(ehdr->ether_shost, destIPInterface->addr, ETHER_ADDR_LEN);
+				ehdr->ether_type = htons(ethertype_arp);
+				/*Set the ARP packet's ARP header*/
+				sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(arpRequestPacket + sizeof(sr_ethernet_hdr_t));
+				arp_hdr->ar_hrd = htons(arp_hrd_ethernet);
+				arp_hdr->ar_pro = htons(ethertype_ip);
+				arp_hdr->ar_hln = ETHER_ADDR_LEN;
+				arp_hdr->ar_pln = 4;
+				arp_hdr->ar_op = htons(arp_op_request);
+				memcpy(arp_hdr->ar_sha, destIPInterface->addr, ETHER_ADDR_LEN);
+				arp_hdr->ar_sip = destIPInterface->ip;
+				/* uint8_t broadcastArpAddr[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};*/ 
+				memcpy(arp_hdr->ar_tha, broadcastAddr, ETHER_ADDR_LEN);
+				arp_hdr->ar_tip = req->ip;
+				/*print_hdr_arp(arp_hdr);*/
+				sr_send_packet(sr, arpRequestPacket, len, destIPInterface->name);
+				/*printf("************************broadcast arp requests **********************\n");*/
+				free(arpRequestPacket);
+			}
+			
+                           
+		}
+	}	    
                        
 }
       			
@@ -123,7 +117,7 @@ void sr_arpcache_sweepreqs(struct sr_instance *sr) {
 		  handle_arpreq(req,sr);
 		  
 	}	       
-    printf("************************Arpcache_Sweepreqs ends**********************\n") ;             
+   /* printf("************************Arpcache_Sweepreqs ends**********************\n") ;*/             
 }
 
 
