@@ -156,10 +156,10 @@ void process_ip_pkt(struct sr_instance* sr,
 	
 	print_hdr_ip((uint8_t *)ip_hdr);
 	longest_prefix_match = sr_rtable_lookup(sr, ip_hdr->ip_dst);
-	ip_hdr->ip_ttl--;
+	
 	if(sr_contains_interface(sr, ip_hdr->ip_dst)){
 		
-		if(ip_hdr->ip_p == ip_protocol_icmp){
+		if(ip_hdr->ip_p == (uint8_t)ip_protocol_icmp){
 			printf("icmp\n");
 			send_icmp_pkt(sr, len, packet, ICMP_ECHO_REPLY_CODE, 0, incoming_interface);
 			/*process_icmp_packet(sr, len, packet, interface);		*/
@@ -169,6 +169,13 @@ void process_ip_pkt(struct sr_instance* sr,
 			return;
 		}	
 	}else{
+		uint8_t packet_ttl = ip_hdr->ip_ttl - 1;
+		if(packet_ttl <= 0){
+			/*Send ICMP packet timeout*/
+			send_icmp_pkt(sr, len, packet, ICMP_TIME_EXCEEDED_TYPE, 0, incoming_interface);	
+			return;
+		}
+		ip_hdr->ip_ttl--;
 		if(!longest_prefix_match){
 			/*Send Icmp destation unreachable*/	
 			printf("Cannot found in rt. Send Icmp destation unreachable");
@@ -176,12 +183,6 @@ void process_ip_pkt(struct sr_instance* sr,
 			return;	
 		}
 		
-		if(ip_hdr->ip_ttl <= 0){
-			/*Send ICMP packet timeout*/
-			ip_hdr->ip_ttl++;
-			send_icmp_pkt(sr, len, packet, ICMP_TIME_EXCEEDED_TYPE, ICMP_NET_CODE, incoming_interface);	
-			return;
-		}
 		printf("packet forwarding\n");
 		ip_hdr->ip_sum = 0;
 		ip_hdr->ip_sum = cksum(ip_hdr, ip_hdr->ip_hl*4);
@@ -218,15 +219,13 @@ void send_icmp_pkt(struct sr_instance* sr, unsigned int len, uint8_t *packet, ui
 	unsigned int new_pkt_len = len;  
 	struct sr_if *outgoing_interface;
 	printf("when process icmp ====================\n");
-	/*valid icmp packet*/
-	ip_hdr = get_ip_header(packet);
 	
 	
 	original_ether_hdr = (struct sr_ethernet_hdr *)packet;
 	original_ip_hdr = get_ip_header(packet);
 	
 	longest_prefix_match = sr_rtable_lookup(sr, original_ip_hdr->ip_src);
-	outgoing_interface = sr_get_interface(sr, longest_prefix_match->interface);
+	outgoing_interface = sr_get_interface(sr, incoming_interface);
 
 
 	if(!longest_prefix_match){
@@ -234,9 +233,9 @@ void send_icmp_pkt(struct sr_instance* sr, unsigned int len, uint8_t *packet, ui
 		return;		
 	}
 	if(icmp_type == ICMP_ECHO_REPLY_CODE){
-		icmp_hdr = get_icmp_header(ip_hdr);
+		icmp_hdr = get_icmp_header(original_ip_hdr);
 		print_hdr_icmp((uint8_t *)icmp_hdr);
-		if(!is_icmp_pkt_valid(ip_hdr)){
+		if(!is_icmp_pkt_valid(original_ip_hdr)){
 			printf("invalid icmp packet");
 			return;	
 		}
@@ -272,13 +271,13 @@ void send_icmp_pkt(struct sr_instance* sr, unsigned int len, uint8_t *packet, ui
 		
 	}
 	
-	else if(icmp_type == ICMP_UNREACHABLE_TYPE){
+	else if(icmp_type == ICMP_UNREACHABLE_TYPE || icmp_type == ICMP_TIME_EXCEEDED_TYPE){
 		printf("icmp 3\n");
 		new_pkt_len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
 		new_packet = (uint8_t *)malloc(new_pkt_len);
 		new_ether_hdr = (sr_ethernet_hdr_t *)new_packet;
 		ip_hdr = (sr_ip_hdr_t *)(new_packet + sizeof(sr_ethernet_hdr_t));
-		icmp_t3_hdr = (sr_icmp_t3_hdr_t *)(new_packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
+		icmp_t3_hdr = (sr_icmp_t3_hdr_t *)(ip_hdr + sizeof(sr_ip_hdr_t));
 		
 
 		/*memcpy(ip_hdr, original_ip_hdr, sizeof(sr_ip_hdr_t));*/
@@ -289,7 +288,7 @@ void send_icmp_pkt(struct sr_instance* sr, unsigned int len, uint8_t *packet, ui
 		ip_hdr->ip_tos = 0;
 		ip_hdr->ip_len = htons(sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t));
 		ip_hdr->ip_off = htons(IP_DF);
-		ip_hdr->ip_ttl = 64;
+		ip_hdr->ip_ttl = INIT_TTL;
 		ip_hdr->ip_src = outgoing_interface->ip;
 		ip_hdr->ip_dst = original_ip_hdr->ip_src;		
 		ip_hdr->ip_p = ip_protocol_icmp;
