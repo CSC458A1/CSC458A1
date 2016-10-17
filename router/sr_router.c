@@ -384,9 +384,9 @@ void process_arp_packet(struct sr_instance* sr,
     }
 }
 
-void process_icmp_packet(struct sr_instance* sr, struct sr_ip_hdr_t *ip_hdr, char* incoming_interface/* lent */)
+void process_icmp_packet(struct sr_instance* sr, uint8_t* packet, char* incoming_interface/* lent */)
 {
-   /* print_hdr_arp((uint8_t *)get_arp_header(packet));*/
+    print_hdr_arp((uint8_t *)get_arp_header(packet));
     struct sr_arp_hdr *arp_hdr;
 	struct sr_arpreq *arp_req;
 	struct sr_if *src_iface; 
