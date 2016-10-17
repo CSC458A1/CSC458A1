@@ -369,7 +369,7 @@ void process_arp_packet(struct sr_instance* sr,
         sr_if_t *iface = sr_get_interface(sr, interface);
         if (arp_hdr->ar_tip == iface->ip) {
             printf("arp reply matches interface, adding to cache\n");
-            sr_arpcache_insert(&(sr->cache), interface, arp_hdr->ar_tip);
+            sr_arpcache_insert(&(sr->cache), incoming_interface, arp_hdr->ar_tip);
         }
     } else {
         if (entry == NULL) {
