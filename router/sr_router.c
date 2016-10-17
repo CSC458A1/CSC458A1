@@ -358,7 +358,12 @@ void forward_ip_packet(struct sr_instance* sr,
 void process_arp_packet(struct sr_instance* sr,
         uint8_t * packet/* lent */,
         unsigned int len,
+<<<<<<< HEAD
         char* interface/* lent */){
+=======
+        char* incoming_interface/* lent */)
+{
+>>>>>>> 47c9e3caecb2fd14de11604aed133e0949049188
     print_hdr_arp(packet);
     sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(packet);
         /* Look in arp table */
@@ -383,7 +388,11 @@ void process_arp_packet(struct sr_instance* sr,
     }
 }
 
+<<<<<<< HEAD
 void process_icmp_packet(struct sr_instance* sr, struct sr_ip_hdr_t *ip_hdr, char* incoming_interface/* lent */)
+=======
+void process_icmp_packet(struct sr_instance* sr, struct sr_ip_hdr_t *ip_hdr)
+>>>>>>> 47c9e3caecb2fd14de11604aed133e0949049188
 {
    /* print_hdr_arp((uint8_t *)get_arp_header(packet));*/
     struct sr_arp_hdr *arp_hdr;
