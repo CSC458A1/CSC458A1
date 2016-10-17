@@ -9,6 +9,7 @@
 #include "sr_arpcache.h"
 #include "sr_router.h"
 #include "sr_if.h"
+#include "sr_rt.h"
 #include "sr_protocol.h"
 
 /* 
@@ -38,7 +39,9 @@ void handle_arpreq(struct sr_arpreq *req, struct sr_instance *sr) {
 			req->sent = now;
 			req->times_sent++ ;
 			struct sr_if *destIPInterface;
-			destIPInterface = sr_get_interface(sr, req->packets->iface);	
+			struct sr_rt *longest_prefix_match;
+			longest_prefix_match = sr_rtable_lookup(sr, req->ip);
+			destIPInterface = sr_get_interface(sr, longest_prefix_match->interface);	
 			if(destIPInterface == NULL){       
 				fprintf(stderr,"Fail due to empty rInterface in sr_arpcache\n");
 			}
@@ -60,12 +63,12 @@ void handle_arpreq(struct sr_arpreq *req, struct sr_instance *sr) {
 				arp_hdr->ar_op = htons(arp_op_request);
 				memcpy(arp_hdr->ar_sha, destIPInterface->addr, ETHER_ADDR_LEN);
 				arp_hdr->ar_sip = destIPInterface->ip;
-				/* uint8_t broadcastArpAddr[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};*/ 
-				memcpy(arp_hdr->ar_tha, broadcastAddr, ETHER_ADDR_LEN);
+				uint8_t broadcastArpAddr[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+				memcpy(arp_hdr->ar_tha, broadcastArpAddr, ETHER_ADDR_LEN);
 				arp_hdr->ar_tip = req->ip;
 				/*print_hdr_arp(arp_hdr);*/
 				sr_send_packet(sr, arpRequestPacket, len, destIPInterface->name);
-				/*printf("************************broadcast arp requests **********************\n");*/
+				printf("************************broadcast arp requests **********************\n");
 				free(arpRequestPacket);
 			}
 			
