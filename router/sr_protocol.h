@@ -84,6 +84,8 @@
   #endif
 #endif
 #define ICMP_DATA_SIZE 28
+#define MIN_IP_HEADER_LEN 5
+#define IPV4 4
 
 
 /* Structure of a ICMP header
