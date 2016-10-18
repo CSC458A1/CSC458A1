@@ -24,7 +24,7 @@ void handle_arpreq(struct sr_arpreq *req, struct sr_instance *sr) {
 	{
     	struct sr_packet *packet;	
     	for(packet=req->packets; packet != NULL; packet = packet->next){
-      		send_icmp_pkt(sr,packet->len,packet->buf,3,1,packet->iface);
+      		send_icmp_pkt(sr, packet->len, packet->buf, ICMP_UNREACHABLE_TYPE, ICMP_HOST_CODE, packet->iface);
       	}
     	sr_arpreq_destroy(&sr->cache,req);
 	}
