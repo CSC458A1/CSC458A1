@@ -287,8 +287,8 @@ void send_icmp_pkt(struct sr_instance* sr, unsigned int len, uint8_t *packet, ui
 		ip_hdr->ip_len = htons(new_pkt_len - sizeof(sr_ethernet_hdr_t));
 		ip_hdr->ip_off = htons(IP_DF);
 		ip_hdr->ip_ttl = INIT_TTL;
-		ip_hdr->ip_src = outgoing_interface->ip;
-		ip_hdr->ip_dst = original_ip_hdr->ip_src;		
+		ip_hdr->ip_src = original_ip_hdr->ip_dst;
+		ip_hdr->ip_dst = original_ip_hdr->ip_src;
 		ip_hdr->ip_p = ip_protocol_icmp;
 		ip_hdr->ip_sum = cksum(ip_hdr, ip_hdr->ip_hl * 4);	
 		
@@ -328,6 +328,14 @@ void forward_ip_packet(struct sr_instance* sr,
 	longest_prefix_match = sr_rtable_lookup(sr, ip_hdr->ip_dst);
 	outgoing_interface = sr_get_interface(sr, longest_prefix_match->interface); 
 	arp_cache_entry = sr_arpcache_lookup(&sr->cache, longest_prefix_match->gw.s_addr);
+    
+    ip_hdr->ip_ttl--;
+    if (ip_hdr->ip_ttl <= 0) {
+        send_icmp_pkt(sr, len, packet, ICMP_TIME_EXCEEDED_TYPE, 0, incoming_interface);
+    } else {
+        ip_hdr->ip_sum = 0;
+        ip_hdr->ip_sum = cksum(ip_hdr, ip_hdr->ip_hl*4);
+    }
 	
 	/*printf("the ip packer i got for forwarding\n");
 	print_hdr_ip((uint8_t *)ip_hdr);
@@ -344,9 +352,6 @@ void forward_ip_packet(struct sr_instance* sr,
 		memcpy(ethernet_hdr->ether_shost, outgoing_interface->addr, ETHER_ADDR_LEN);
 		memcpy(ethernet_hdr->ether_dhost, arp_cache_entry->mac, ETHER_ADDR_LEN);
 		printf("entry found\n");
-		ip_hdr->ip_ttl--;
-		ip_hdr->ip_sum = 0;
-		ip_hdr->ip_sum = cksum(ip_hdr, ip_hdr->ip_hl*4);
 		print_hdr_eth(ethernet_hdr);
         print_hdr_ip((uint8_t *)ip_hdr);
         print_hdr_icmp((uint8_t *)get_icmp_header(ip_hdr));
