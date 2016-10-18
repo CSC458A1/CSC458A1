@@ -1,5 +1,6 @@
 The structure of our code is the following:
 
+ROUTER.C
 sr_handlepacket (called everytime the router receives a packet on an interface)
 The router receives a packet. It then checks the ethernet header and determines what type of packet it is.
 If the header has a header type of IP, then process it as a IP packet. Else, process it as an ARP packet. If the header type is not of either IP or ARP, drop the packet.
@@ -11,7 +12,7 @@ If the destination does not match the router, it will find the destination in th
 If the destination does not match the router, and a prefix match exists, it will forward the packet.
 
 send_icmp_pkt (called everytime we need to send an ICMP response)
-This method takes in parameters ICPM_TYPE and ICMP_CODE. It will create a new packet in memory with the appropriate headers modified from the original packet the ICMP packet is responding to.
+This method takes in parameters ICMP_TYPE and ICMP_CODE. It will create a new packet in memory with the appropriate headers modified from the original packet the ICMP packet is responding to.
 
 forward_ip_packet (called everytime we forward an IP packet)
 This method takes in the original packet. We look up the longest prefix match of the destination ip in the routing table. We the check the arp_cache to see if the destination ip already exists.
@@ -21,4 +22,13 @@ If the ip does not exist in the arp_cache, we queue an arp_cache request for the
 process_arp_packet (called everytime we receive an ARP packet)
 The router checks if the arp packet is valid. If not valid, it drops the packet.
 Else, it checks if the arp packet is a request or a reply.
-If the packet is a request, it forwards
+If the packet is a request, it adds the source ip into the arpcache and sense a arp response back to the incoming interface.
+If the packet is a reply, it tries to insert the ip into the arp cache and calls handle packet on all the packets waiting on the arp request response.
+
+ARPCACHE.C
+sr_arpcache_sweepreqs
+For every entry in the arp_cache, we check if the arp request has been sent 5 times. If it has been, we send an ICMP response Type 3 Code 1 back to the origin.
+Else, we increment the times sent, and flood the arp request to every interface in the router.
+
+Design Decisions
+All packet handling logic exist in their own method to ease debugging. The method to send ICMP responses is a catch all method that is capable of sending all ICMP responses required by the assignment. This is to minimize the amount of recycled code.
