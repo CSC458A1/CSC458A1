@@ -164,6 +164,7 @@ void process_ip_pkt(struct sr_instance* sr,
 			send_icmp_pkt(sr, len, packet, ICMP_ECHO_REPLY_CODE, 0, incoming_interface);
 		}else{
 			printf("icmp 3 port unreachable\n");
+
 			send_icmp_pkt(sr, len, packet, ICMP_UNREACHABLE_TYPE, ICMP_PORT_CODE, incoming_interface);
 			return;
 		}	
@@ -227,7 +228,6 @@ void send_icmp_pkt(struct sr_instance* sr, unsigned int len, uint8_t *packet, ui
 	longest_prefix_match = sr_rtable_lookup(sr, original_ip_hdr->ip_src);
 	outgoing_interface = sr_get_interface(sr, longest_prefix_match->interface);
 
-
 	if(!longest_prefix_match){
 		printf("there is no interface match found for icmp reply\n");
 		return;		
@@ -267,6 +267,7 @@ void send_icmp_pkt(struct sr_instance* sr, unsigned int len, uint8_t *packet, ui
 		icmp_hdr = get_icmp_header(ip_hdr);
 		icmp_hdr->icmp_sum = cksum(icmp_hdr, ntohs(ip_hdr->ip_len) - ip_hdr->ip_hl*4);
 		new_ether_hdr->ether_type = htons(ethertype_ip);
+
 	}
 	
 	else if(icmp_type == ICMP_UNREACHABLE_TYPE || icmp_type == ICMP_TIME_EXCEEDED_TYPE){
@@ -294,10 +295,11 @@ void send_icmp_pkt(struct sr_instance* sr, unsigned int len, uint8_t *packet, ui
 		icmp_t3_hdr->icmp_type = icmp_type;
 		icmp_t3_hdr->icmp_code = icmp_code;
 		icmp_t3_hdr->icmp_sum = 0;
+		icmp_t3_hdr->unused = htons(0);
 		memcpy(icmp_t3_hdr->data, original_ip_hdr, ICMP_DATA_SIZE);
 		
 		icmp_t3_hdr->icmp_sum = cksum(icmp_t3_hdr, ntohs(ip_hdr->ip_len) - sizeof(sr_ip_hdr_t));
-		
+		print_hdr_icmp3(icmp_t3_hdr);
 		memcpy(new_ether_hdr->ether_shost, original_ether_hdr->ether_dhost, ETHER_ADDR_LEN);
 		memcpy(new_ether_hdr->ether_dhost, original_ether_hdr->ether_shost, ETHER_ADDR_LEN);
 		new_ether_hdr->ether_type = htons(ethertype_ip);
@@ -323,7 +325,9 @@ void forward_ip_packet(struct sr_instance* sr,
 	ethernet_hdr = (struct sr_ethernet_hdr *)packet;
 	/*print_hdr_eth(ethernet_hdr);*/
 	ip_hdr = get_ip_header(packet);
-	arp_cache_entry = sr_arpcache_lookup(&sr->cache, ip_hdr->ip_dst);
+	longest_prefix_match = sr_rtable_lookup(sr, ip_hdr->ip_dst);
+	outgoing_interface = sr_get_interface(sr, longest_prefix_match->interface); 
+	arp_cache_entry = sr_arpcache_lookup(&sr->cache, longest_prefix_match->gw.s_addr);
 	
 	/*printf("the ip packer i got for forwarding\n");
 	print_hdr_ip((uint8_t *)ip_hdr);
@@ -331,7 +335,7 @@ void forward_ip_packet(struct sr_instance* sr,
     if (arp_cache_entry == NULL) {
 		printf("no entry found\n");
 		/*memcpy(ethernet_hdr->ether_shost, outgoing_interface->addr, ETHER_ADDR_LEN);*/
-        arp_req = sr_arpcache_queuereq(&sr->cache, ip_hdr->ip_dst, packet, len, incoming_interface);
+        arp_req = sr_arpcache_queuereq(&sr->cache, longest_prefix_match->gw.s_addr, packet, len, incoming_interface);
 		handle_arpreq(arp_req, sr);
     } else {
 		/*Modifiy ethernet packet*/
@@ -427,10 +431,10 @@ int is_icmp_pkt_valid(struct sr_ip_hdr *ip_hdr){
 	icmp_hdr->icmp_sum = 0;
 	icmp_sum_correct = cksum (icmp_hdr, ntohs(ip_hdr->ip_len) - ip_hdr->ip_hl*4);
 	fprintf(stderr, "\tchecksum: %d\n", icmp_sum_correct);
+	icmp_hdr->icmp_sum = icmp_sum_received;
 	if(icmp_sum_correct != icmp_sum_received){
 		return 0;	
 	}
-	
 	return 1;
 	
 }

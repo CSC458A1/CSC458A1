@@ -141,6 +141,7 @@ void print_hdr_icmp3(uint8_t *buf) {
   fprintf(stderr, "\tcode: %d\n", icmp_hdr->icmp_code);
   /* Keep checksum in NBO */
   fprintf(stderr, "\tchecksum: %d\n", icmp_hdr->icmp_sum);
+  fprintf(stderr, "\tunused: %d\n", icmp_hdr->unused);
   fprintf(stderr, "\tdata: %d\n", icmp_hdr->data);
 }
 
