@@ -287,7 +287,11 @@ void send_icmp_pkt(struct sr_instance* sr, unsigned int len, uint8_t *packet, ui
 		ip_hdr->ip_len = htons(new_pkt_len - sizeof(sr_ethernet_hdr_t));
 		ip_hdr->ip_off = htons(IP_DF);
 		ip_hdr->ip_ttl = INIT_TTL;
-		ip_hdr->ip_src = original_ip_hdr->ip_dst;
+        if (icmp_code == ICMP_PORT_CODE) {
+            ip_hdr->ip_src = original_ip_hdr->ip_dst;
+        } else {
+            ip_hdr->ip_src = outgoing_interface->ip;
+        }
 		ip_hdr->ip_dst = original_ip_hdr->ip_src;
 		ip_hdr->ip_p = ip_protocol_icmp;
 		ip_hdr->ip_sum = cksum(ip_hdr, ip_hdr->ip_hl * 4);	
