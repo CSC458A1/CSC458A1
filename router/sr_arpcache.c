@@ -33,15 +33,9 @@ void handle_arpreq(struct sr_arpreq *req, struct sr_instance *sr) {
 	    req->sent= now;
 	    req->times_sent= req->times_sent + 1;
         struct sr_rt* dst_rt = sr_rtable_lookup(sr, req->ip);
-        if(dst_rt == NULL)
-       	{
-        	fprintf(stderr,"Fail due to empty rInterface in sr_arpcache\n");
-        }
+
         struct sr_if* dst_interface = sr_get_interface(sr, dst_rt->interface);
-        if(!dst_interface)
-       	{
-            fprintf(stderr,"Fail due to empty destIPInterface in sr_arpcache\n");
-        }
+
         unsigned int arp_len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t);
         uint8_t *arp_req_pkt = (uint8_t *)malloc(arp_len);
         	

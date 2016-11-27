@@ -65,11 +65,17 @@ int main(int argc, char **argv)
     unsigned int port = DEFAULT_PORT;
     unsigned int topo = DEFAULT_TOPO;
     char *logfile = 0;
+
+	int nat_enable = 1;
+	int icmp_timeout = 60;
+	int tcp_est_timeout = 7440;
+	int tcp_trans_timeout = 300;
+
     struct sr_instance sr;
 
     printf("Using %s\n", VERSION_INFO);
 
-    while ((c = getopt(argc, argv, "hs:v:p:u:t:r:l:T:")) != EOF)
+    while ((c = getopt(argc, argv, "hs:v:p:u:t:r:l:T:n:I:E:R")) != EOF)
     {
         switch (c)
         {
@@ -101,6 +107,19 @@ int main(int argc, char **argv)
             case 'T':
                 template = optarg;
                 break;
+			case 'n':
+				nat_enable = optarg;
+				break;
+			case 'I':
+				icmp_timeout = optarg;
+				break;
+			case 'E':
+				tcp_est_timeout = optarg;
+				break;
+			case 'R':
+				tcp_trans_tiemout = optarg;
+				break;
+				
         } /* switch */
     } /* -- while -- */
 
@@ -155,6 +174,9 @@ int main(int argc, char **argv)
       /* Read from specified routing table */
       sr_load_rt_wrap(&sr, rtable);
     }
+/*
+
+	
 
     /* call router init (for arp subsystem etc.) */
     sr_init(&sr);
