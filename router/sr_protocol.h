@@ -46,8 +46,6 @@
 #endif
 
 #define ICMP_IP_HDR_LEN 5
-#define ICMP_IP_HDR_LEN_BYTES ICMP_IP_HDR_LEN * 4
-#define ICMP_COPIED_DATAGRAM_DATA_LEN 8
 #define ICMP_ECHO_REQUEST_CODE 8 
 #define ICMP_ECHO_REPLY_CODE 0
 #define ICMP_UNREACHABLE_TYPE 3
@@ -84,6 +82,8 @@
   #endif
 #endif
 #define ICMP_DATA_SIZE 28
+#define MIN_IP_HEADER_LEN 5
+#define IPV4 4
 
 
 /* Structure of a ICMP header
@@ -95,7 +95,6 @@ struct sr_icmp_hdr {
   
 } __attribute__ ((packed)) ;
 typedef struct sr_icmp_hdr sr_icmp_hdr_t;
-
 
 /* Structure of a type3 ICMP header
  */
@@ -111,6 +110,15 @@ struct sr_icmp_t3_hdr {
 typedef struct sr_icmp_t3_hdr sr_icmp_t3_hdr_t;
 
 
+struct sr_icmp_t11_hdr{
+	uint8_t icmp_type;
+	uint8_t icmp_code;
+	uint16_t icmp_sum;
+	uint16_t unused;
+	uint16_t next_mtu;
+	uint8_t data[ICMP_DATA_SIZE];
+}  __attribute__ ((packed)) ;
+typedef struct sr_icmp_t11_hdr sr_icmp_t11_hdr_t;
 
 
 /*
@@ -192,6 +200,46 @@ struct sr_arp_hdr
     uint32_t        ar_tip;             /* target IP address            */
 } __attribute__ ((packed)) ;
 typedef struct sr_arp_hdr sr_arp_hdr_t;
+
+struct sr_tcp_hdr 
+{
+    uint16_t tcp_src;
+    uint16_t tcp_dst;
+    uint32_t tcp_seq;
+    uint32_t tcp_ack;
+    uint8_t data_offset;
+    uint8_t flags;
+    uint16_t window_size;
+    uint16_t tcp_sum;
+    uint16_t urgent;   
+}  __attribute__ ((packed)) ;
+typedef struct sr_tcp_hdr sr_tcp_hdr_t;
+
+struct sr_pseudo_hdr
+{
+   uint32_t src;
+   uint32_t dst;
+   uint8_t zeros;
+   uint8_t protocol;
+   uint16_t len;
+}  __attribute__((packed)) ;
+typedef struct sr_pseudo_hdr_t;
+
+struct sr_icmp_echo_hdr
+{  
+   uint8_t icmp_type;
+   uint8_t icmp_code;
+   uint16_t icmp_sum;
+   uint16_t ident;
+   uint16_t seq_num;
+   uint8_t data[1];
+} __attribute__((packed)) ;
+typedef struct sr_icmp_echo_hdr sr_icmp_echo_hdr_t;
+
+
+#define TCP_SYN (0x0002)
+
+#define TCP_FIN (0x0001)
 
 #define sr_IFACE_NAMELEN 32
 

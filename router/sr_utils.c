@@ -43,6 +43,14 @@ struct sr_arp_hdr *get_arp_header(uint8_t *buf){
 	return (struct sr_arp_hdr *)(buf + sizeof(struct sr_ethernet_hdr));
 }
 
+struct sr_icmp_t3_hdr *get_icmp_t3_header(struct sr_ip_hdr *ip_hdr){
+	return (struct sr_icmp_t3_hdr *)((uint8_t *)ip_hdr + ip_hdr->ip_hl * 4);
+}
+
+struct sr_tcp_hdr *get_tcp_header(struct sr_ip_hdr *ip_hdr){
+	return (struct sr_tcp_hdr *)((uint8_t *)ip_hdr + ip_hdr->ip_hl * 4);
+}
+
 /* Prints out formatted Ethernet address, e.g. 00:11:22:33:44:55 */
 void print_addr_eth(uint8_t *addr) {
   int pos = 0;
@@ -130,6 +138,17 @@ void print_hdr_icmp(uint8_t *buf) {
   fprintf(stderr, "\tchecksum: %d\n", icmp_hdr->icmp_sum);
 }
 
+/* Prints out ICMP header fields */
+void print_hdr_icmp3(uint8_t *buf) {
+  sr_icmp_t3_hdr_t *icmp_hdr = (sr_icmp_t3_hdr_t *)(buf);
+  fprintf(stderr, "ICMP header:\n");
+  fprintf(stderr, "\ttype: %d\n", icmp_hdr->icmp_type);
+  fprintf(stderr, "\tcode: %d\n", icmp_hdr->icmp_code);
+  /* Keep checksum in NBO */
+  fprintf(stderr, "\tchecksum: %d\n", icmp_hdr->icmp_sum);
+  fprintf(stderr, "\tunused: %d\n", icmp_hdr->unused);
+  fprintf(stderr, "\tdata: %d\n", icmp_hdr->data);
+}
 
 /* Prints out fields in ARP header */
 void print_hdr_arp(uint8_t *buf) {

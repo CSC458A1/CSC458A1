@@ -44,6 +44,10 @@ extern char* optarg;
 #define DEFAULT_SERVER "localhost"
 #define DEFAULT_RTABLE "rtable"
 #define DEFAULT_TOPO 0
+#define DEFAULT_NAT false
+#define DEFAULT_ICMP_TIMEOUT 60
+#define DEFAULT_TCP_ESTABILISHED_IDLE_TIMEOUT 7440
+#define DEFAULT_TCP_TRANSITORY_TIMEOUT 300
 
 static void usage(char* );
 static void sr_init_instance(struct sr_instance* );
@@ -62,6 +66,10 @@ int main(int argc, char **argv)
     char *server = DEFAULT_SERVER;
     char *rtable = DEFAULT_RTABLE;
     char *template = NULL;
+    char *nat = DEFAULT_NAT;
+    int icmpQueryTimeout = DEFAULT_ICMP_TIMEOUT;
+    int tcpEstablishedIdleTimeout = DEFAULT_TCP_ESTABILISHED_IDLE_TIMEOUT;
+    int tcpTransitoryIdleTimeout = DEFAULT_TCP_TRANSITORY_TIMEOUT;
     unsigned int port = DEFAULT_PORT;
     unsigned int topo = DEFAULT_TOPO;
     char *logfile = 0;
@@ -69,7 +77,7 @@ int main(int argc, char **argv)
 
     printf("Using %s\n", VERSION_INFO);
 
-    while ((c = getopt(argc, argv, "hs:v:p:u:t:r:l:T:")) != EOF)
+    while ((c = getopt(argc, argv, "hs:v:p:u:t:r:l:T:n:I:E:R")) != EOF)
     {
         switch (c)
         {
@@ -100,6 +108,14 @@ int main(int argc, char **argv)
                 break;
             case 'T':
                 template = optarg;
+            case 'n':
+                nat = true;
+            case 'I':
+                icmpQueryTimeout = atoi((char *) optarg);
+            case 'E':
+                tcpEstabilishedIdleTimeout = atoi((char *) optarg);
+            case 'R':
+                tcpTransitoryIdleTimeout = atoi((char *) optarg);
                 break;
         } /* switch */
     } /* -- while -- */
@@ -156,6 +172,15 @@ int main(int argc, char **argv)
       sr_load_rt_wrap(&sr, rtable);
     }
 
+    if (nat) {
+        sr.nat = malloc(sizeof(sr_nat_t));
+        sr_nat_init(sr.nat);
+        
+        sr.nat->routerState = &sr;
+        sr.nat->icmpTimeout = icmpQueryTimeout;
+        sr.nat->tcpEstabilishedIdleTimeout = tcpQueryEstabilishedIdleTimeout;
+        sr.nat->tcpTransitoryIdleTimeout = tcpTransitoryIdleTimeout;
+    }
     /* call router init (for arp subsystem etc.) */
     sr_init(&sr);
 
@@ -249,6 +274,7 @@ static void sr_init_instance(struct sr_instance* sr)
     sr->if_list = 0;
     sr->routing_table = 0;
     sr->logfile = 0;
+    sr->nat = NULL;
 } /* -- sr_init_instance -- */
 
 /*-----------------------------------------------------------------------------
