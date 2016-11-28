@@ -172,9 +172,10 @@ void *sr_nat_timeout(void *nat_ptr) {  /* Periodic Timout handling */
     				}
     			}
     		}
+    		current_entry = current_entry->next;
     		
     	}
-    	current_entry = current_entry->next;
+
     }
 
     pthread_mutex_unlock(&(nat->lock));
