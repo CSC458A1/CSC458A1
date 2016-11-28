@@ -46,6 +46,11 @@ struct sr_arp_hdr *get_arp_header(uint8_t *buf){
 struct sr_icmp_t3_hdr *get_icmp_t3_header(struct sr_ip_hdr *ip_hdr){
 	return (struct sr_icmp_t3_hdr *)((uint8_t *)ip_hdr + ip_hdr->ip_hl * 4);
 }
+
+struct sr_tcp_hdr *get_tcp_header(struct sr_ip_hdr *ip_hdr){
+	return (struct sr_tcp_hdr *)((uint8_t *)ip_hdr + ip_hdr->ip_hl * 4);
+}
+
 /* Prints out formatted Ethernet address, e.g. 00:11:22:33:44:55 */
 void print_addr_eth(uint8_t *addr) {
   int pos = 0;

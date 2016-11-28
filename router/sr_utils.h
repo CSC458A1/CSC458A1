@@ -37,6 +37,7 @@ struct sr_icmp_hdr *get_icmp_header(struct sr_ip_hdr *ip_hdr);
 struct sr_ip_hdr *get_ip_header(uint8_t *buf);
 struct sr_arp_hdr *get_arp_header(uint8_t *buf);
 struct sr_icmp_t3_hdr *get_icmp_t3_header(struct sr_ip_hdr *ip_hdr);
+struct sr_tcp_hdr *get_tcp_header(struct sr_ip_hdr *ip_hdr);
 
 void print_addr_eth(uint8_t *addr);
 void print_addr_ip(struct in_addr address);
