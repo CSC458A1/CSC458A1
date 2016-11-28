@@ -121,16 +121,6 @@ struct sr_rt* sr_rtable_lookup(struct sr_instance *sr, uint32_t destIP){
         uint32_t curDest = rTable->dest.s_addr;
 		uint32_t cur_entry_prefix = curMask & curDest;
 		uint32_t dst_prefix = destIP& curMask;
-       /* if(rMask == 0 || curMask > rMask)
-        {
-            Check with Longest Prefix Match Algorithm
-            uint32_t newDestIP = (destIP & curMask);
-            if(newDestIP == curDest)
-            {
-                rMask = curMask;
-                longest_match = rTable;
-            } 
-        }*/
 		if(cur_entry_prefix == dst_prefix && (!longest_match || curMask > longest_match->mask.s_addr)){
 			longest_match =rTable;
 		}

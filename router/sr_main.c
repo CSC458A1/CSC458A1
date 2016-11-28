@@ -1,3 +1,4 @@
+
 /*-----------------------------------------------------------------------------
  * File: sr_main.c
  * Date: Fall 2009
@@ -32,6 +33,7 @@
 #include "sr_dumper.h"
 #include "sr_router.h"
 #include "sr_rt.h"
+#include "sr_nat.h"
 
 extern char* optarg;
 
@@ -117,7 +119,7 @@ int main(int argc, char **argv)
 				tcp_est_timeout = optarg;
 				break;
 			case 'R':
-				tcp_trans_tiemout = optarg;
+				tcp_trans_timeout = optarg;
 				break;
 				
         } /* switch */
@@ -174,8 +176,17 @@ int main(int argc, char **argv)
       /* Read from specified routing table */
       sr_load_rt_wrap(&sr, rtable);
     }
-/*
-
+	/* nat */
+	if(nat_enable){
+		sr.nat = (struct sr_nat *)malloc(sizeof(struct sr_nat));
+		sr_nat_init(sr.nat);
+		sr.nat->icmp_timeout = icmp_timeout;
+		sr.nat->tcp_est_timeout = tcp_est_timeout;
+		sr.nat->tcp_trans_timeout = tcp_trans_timeout;
+	}else{
+		sr.nat = NULL;
+	}
+	
 	
 
     /* call router init (for arp subsystem etc.) */
