@@ -308,7 +308,7 @@ void send_icmp_pkt(struct sr_instance* sr, unsigned int len, uint8_t *packet, ui
 		new_ether_hdr->ether_type = htons(ethertype_ip);
 
 	}
-
+	printf("before forwarding icmp\n");
 	forward_ip_packet(sr, new_packet, new_pkt_len, incoming_interface);
 	free(new_packet);
 	
@@ -330,9 +330,9 @@ void forward_ip_packet(struct sr_instance* sr,
 	ip_hdr = get_ip_header(packet);
 	longest_prefix_match = sr_rtable_lookup(sr, ip_hdr->ip_dst);
 	
-
+	printf("i got here\n");
 	outgoing_interface = sr_get_interface(sr, longest_prefix_match->interface); 
-
+	
 	arp_cache_entry = sr_arpcache_lookup(&sr->cache, longest_prefix_match->gw.s_addr);
 
     ip_hdr->ip_ttl--;

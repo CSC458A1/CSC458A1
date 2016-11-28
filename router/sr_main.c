@@ -68,7 +68,7 @@ int main(int argc, char **argv)
     unsigned int topo = DEFAULT_TOPO;
     char *logfile = 0;
 
-	int nat_enable = 1;
+	int nat_enable = 0;
 	int icmp_timeout = 60;
 	int tcp_est_timeout = 7440;
 	int tcp_trans_timeout = 300;
@@ -110,6 +110,7 @@ int main(int argc, char **argv)
                 template = optarg;
                 break;
 			case 'n':
+				printf("nat router mode===============================================\n");
 				nat_enable = 1;
 				break;
 			case 'I':
@@ -180,7 +181,7 @@ int main(int argc, char **argv)
     
 	/* nat */
 	if(nat_enable == 1){
-		printf("nat router mode\n");
+		printf("nat router mode===============================================\n");
 		sr.nat_enabled = 1;
 		sr.nat = (struct sr_nat *)malloc(sizeof(struct sr_nat));
 		sr_nat_init(sr.nat);

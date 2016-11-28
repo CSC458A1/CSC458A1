@@ -137,7 +137,7 @@ void sr_nat_mapping_con_destroy(struct sr_nat_mapping* mapping, struct sr_nat_co
 
 void *sr_nat_timeout(void *nat_ptr) {  /* Periodic Timout handling */
   struct sr_nat *nat = (struct sr_nat *)nat_ptr;
-  printf("timeout\n");
+
   while (1) {
     sleep(1.0);
     pthread_mutex_lock(&(nat->lock));
@@ -289,7 +289,7 @@ struct sr_nat_mapping *sr_nat_packet_mapping_lookup(struct sr_instance *sr,
         uint8_t * packet/* lent */,
         unsigned int len,
         char* interface/* lent */,
-        int is_incoming_pkt){
+        pkt_forwarding_dir pkt_dir){
 	struct sr_ip_hdr *ip_hdr = get_ip_header(packet);
 	struct sr_nat_mapping *mapping;
 	uint16_t port_number = 0;
@@ -301,7 +301,7 @@ struct sr_nat_mapping *sr_nat_packet_mapping_lookup(struct sr_instance *sr,
 		port_number = icmp_hdr->icmp_id;
 	}
 	
-	if(is_incoming_pkt){
+	if(pkt_dir == incoming){
 		printf("incoming port %x\n", port_number);
 		mapping = sr_nat_lookup_external(sr->nat, port_number, type);
 		if(mapping == NULL){
@@ -309,7 +309,7 @@ struct sr_nat_mapping *sr_nat_packet_mapping_lookup(struct sr_instance *sr,
 		}
 	}
 	
-	if(!is_incoming_pkt){
+	if(pkt_dir == outgoing){
 		mapping = sr_nat_lookup_internal(sr->nat, ip_hdr->ip_src, port_number, type);
 		if(mapping == NULL){
 			mapping = sr_nat_insert_mapping(sr->nat, ip_hdr->ip_src, port_number, type);
@@ -327,9 +327,14 @@ int sr_nat_modify_packet(struct sr_instance *sr,
 	struct sr_ip_hdr *ip_hdr = get_ip_header(packet);
 	print_addr_ip_int(ntohl(ip_hdr->ip_src));
 	printf("before incoming finding end\n");
-	int incoming_pkt = sr_nat_is_incoming_pkt(sr, ip_hdr);
+	pkt_forwarding_dir pkt_dir = sr_nat_get_pkt_dir(sr, ip_hdr);
+	
+	if(pkt_dir == int_ext_only){
+		return 0;
+	}
+	
 	printf("incoming finding end\n");
-	struct sr_nat_mapping *mapping = sr_nat_packet_mapping_lookup(sr, packet, len, interface, incoming_pkt);
+	struct sr_nat_mapping *mapping = sr_nat_packet_mapping_lookup(sr, packet, len, interface, pkt_dir);
 	printf("mapping finding end\n");
 	if(mapping == NULL){
 		printf("no mapping found\n");
@@ -343,12 +348,12 @@ int sr_nat_modify_packet(struct sr_instance *sr,
 		struct sr_icmp_hdr *icmp_hdr;
 		icmp_hdr = get_icmp_header(ip_hdr);
 		printf("before incoming/outgoing\n");
-		if(incoming_pkt){
+		if(pkt_dir == incoming){
 			printf("incoming\n");
 			print_addr_ip_int(ntohl(mapping->ip_int));
 			ip_hdr->ip_dst = mapping->ip_int;
 			icmp_hdr->icmp_id = mapping->aux_int;		
-		}else{
+		}else if(pkt_dir == outgoing){
 			printf("outgoing\n");
 			printf("port %x\n", mapping->aux_ext);
 			ip_hdr->ip_src = mapping->ip_ext;
@@ -367,7 +372,7 @@ int sr_nat_modify_packet(struct sr_instance *sr,
 
 }
 
-int sr_nat_is_incoming_pkt(struct sr_instance *sr,
+pkt_forwarding_dir sr_nat_get_pkt_dir(struct sr_instance *sr,
         struct sr_ip_hdr *ip_hdr){
     int is_src_int = 0;
 	int is_dst_int = 0;
@@ -392,13 +397,13 @@ int sr_nat_is_incoming_pkt(struct sr_instance *sr,
 	struct sr_if *ext_if = sr_get_nat_interface_ext(sr);
 	if(!is_src_int && ext_if->ip == ip_hdr->ip_dst){
 		printf("this is the icmp reply\n");
-		return 1;
+		return incoming;
 	}
 	if(is_src_int && ext_if->ip != ip_hdr->ip_dst){
-		return 0;
+		return outgoing;
 	}
 	
-	return 0;
+	return int_ext_only;
 }
 
 

@@ -14,9 +14,14 @@ typedef enum {
 
 typedef enum{
   tcp_connected,
-  tcp_listen,
-  tcp_closed
+  tcp_other
 } current_tcp_conn_state;
+
+typedef enum{
+	incoming,
+	outgoing,
+	int_ext_only
+} pkt_forwarding_dir;
 
 struct sr_nat_connection {
   /* add TCP connection state data members here */
@@ -26,6 +31,10 @@ struct sr_nat_connection {
   uint32_t dst_ip;
   uint16_t interal;
   uint16_t external;
+  uint8_t S_SYN;
+  uint8_t R_SYN;
+  uint8_t S_FIN;
+  uint8_t S_FIN
   struct sr_nat_connection *next;
 };
 
@@ -80,7 +89,7 @@ struct sr_nat_mapping *sr_nat_insert_mapping(struct sr_nat *nat,
 
 int sr_nat_modify_packet(struct sr_instance *sr, uint8_t * packet, unsigned int len, char* interface);
 
-int sr_nat_is_incoming_pkt(struct sr_instance *sr, struct sr_ip_hdr *ip_hdr);
+pkt_forwarding_dir sr_nat_get_pkt_dir(struct sr_instance *sr, struct sr_ip_hdr *ip_hdr);
 struct sr_if* sr_get_nat_interface_ext(struct sr_instance *sr);
 
 #endif
