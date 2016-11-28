@@ -48,6 +48,7 @@ struct sr_nat {
   int tcp_trans_timeout;
   uint32_t nat_ext_ip;
   uint32_t last_assigned_aux;
+  struct sr_instance *sr;
     
 
   /* threading */
@@ -77,5 +78,9 @@ struct sr_nat_mapping *sr_nat_lookup_internal(struct sr_nat *nat,
 struct sr_nat_mapping *sr_nat_insert_mapping(struct sr_nat *nat,
   uint32_t ip_int, uint16_t aux_int, sr_nat_mapping_type type );
 
+int sr_nat_modify_packet(struct sr_instance *sr, uint8_t * packet, unsigned int len, char* interface);
+
+int sr_nat_is_incoming_pkt(struct sr_instance *sr, struct sr_ip_hdr *ip_hdr);
+struct sr_if* sr_get_nat_interface_ext(struct sr_instance *sr);
 
 #endif

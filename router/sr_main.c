@@ -77,7 +77,7 @@ int main(int argc, char **argv)
 
     printf("Using %s\n", VERSION_INFO);
 
-    while ((c = getopt(argc, argv, "hs:v:p:u:t:r:l:T:n:I:E:R")) != EOF)
+    while ((c = getopt(argc, argv, "hns:v:p:u:t:r:l:T:I:E:R:")) != EOF)
     {
         switch (c)
         {
@@ -110,16 +110,16 @@ int main(int argc, char **argv)
                 template = optarg;
                 break;
 			case 'n':
-				nat_enable = optarg;
+				nat_enable = 1;
 				break;
 			case 'I':
-				icmp_timeout = optarg;
+				icmp_timeout = atoi(optarg);
 				break;
 			case 'E':
-				tcp_est_timeout = optarg;
+				tcp_est_timeout = atoi(optarg);
 				break;
 			case 'R':
-				tcp_trans_timeout = optarg;
+				tcp_trans_timeout = atoi(optarg);
 				break;
 				
         } /* switch */
@@ -127,6 +127,7 @@ int main(int argc, char **argv)
 
     /* -- zero out sr instance -- */
     sr_init_instance(&sr);
+    
 
     /* -- set up routing table from file -- */
     if(template == NULL) {
@@ -167,7 +168,7 @@ int main(int argc, char **argv)
     {
         return 1;
     }
-
+	
     if(template != NULL && strcmp(rtable, "rtable.vrhost") == 0) { /* we've recv'd the rtable now, so read it in */
         Debug("Connected to new instantiation of topology template %s\n", template);
         sr_load_rt_wrap(&sr, "rtable.vrhost");
@@ -176,14 +177,22 @@ int main(int argc, char **argv)
       /* Read from specified routing table */
       sr_load_rt_wrap(&sr, rtable);
     }
+    
 	/* nat */
-	if(nat_enable){
+	if(nat_enable == 1){
+		printf("nat router mode\n");
+		sr.nat_enabled = 1;
 		sr.nat = (struct sr_nat *)malloc(sizeof(struct sr_nat));
 		sr_nat_init(sr.nat);
 		sr.nat->icmp_timeout = icmp_timeout;
 		sr.nat->tcp_est_timeout = tcp_est_timeout;
 		sr.nat->tcp_trans_timeout = tcp_trans_timeout;
+		sr.nat->sr = &sr;
+		printf("here\n");
+		struct sr_if *interface_ext = sr_get_interface(&sr, "eth2");
+
 	}else{
+		sr.nat_enabled = 0;
 		sr.nat = NULL;
 	}
 	
