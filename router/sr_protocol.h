@@ -172,6 +172,7 @@ typedef struct sr_ethernet_hdr sr_ethernet_hdr_t;
 
 enum sr_ip_protocol {
   ip_protocol_icmp = 0x0001,
+  ip_protocol_tcp = 0x0006,
 };
 
 enum sr_ethertype {
@@ -203,6 +204,20 @@ struct sr_arp_hdr
     uint32_t        ar_tip;             /* target IP address            */
 } __attribute__ ((packed)) ;
 typedef struct sr_arp_hdr sr_arp_hdr_t;
+
+struct sr_tcp_hdr
+{
+	uint16_t tcp_port_src;
+	uint16_t tcp_port_dst;
+	uint32_t tcp_seqn;
+	uint32_t tcp_ackn;
+	uint8_t  tcp_reserved;
+	uint8_t  tcp_flag;
+	uint16_t tcp_window;
+	uint16_t tcp_sum;
+
+} __attribute__ ((packed)) ;
+typedef struct sr_tcp_hdr sr_tcp_hdr_t;
 
 #define sr_IFACE_NAMELEN 32
 
