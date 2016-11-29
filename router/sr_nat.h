@@ -24,7 +24,8 @@ typedef enum{
 typedef enum{
 	incoming,
 	outgoing,
-	int_ext_only
+	internal,
+	external
 } pkt_forwarding_dir;
 
 struct sr_nat_connection {
@@ -105,5 +106,7 @@ int sr_nat_modify_packet(struct sr_instance *sr, uint8_t * packet, unsigned int 
 pkt_forwarding_dir sr_nat_get_pkt_dir(struct sr_instance *sr, struct sr_ip_hdr *ip_hdr);
 struct sr_if* sr_get_nat_interface_ext(struct sr_instance *sr);
 void sr_nat_tcp_connection_update(struct sr_instance *sr, uint8_t * packet, uint32_t ip_ext, uint16_t aux_ext, struct sr_nat_mapping *mapping, pkt_forwarding_dir pkt_dir);
+
+void sr_nat_send_icmp(struct sr_nat *nat);
 
 #endif

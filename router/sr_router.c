@@ -23,6 +23,7 @@
 #include "sr_protocol.h"
 #include "sr_arpcache.h"
 #include "sr_utils.h"
+#include "sr_nat.h"
 
 /*---------------------------------------------------------------------
  * Method: sr_init(void)
@@ -113,7 +114,7 @@ void sr_handlepacket(struct sr_instance* sr,
         process_arp_packet(sr, packet, len, interface);        
     }else{
 		/* unknow packet type*/
-		return;	
+		return;	   
 	}
 	printf("finshe\n");
 }/* end sr_ForwardPacket */
