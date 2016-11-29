@@ -6,6 +6,9 @@
 #include <time.h>
 #include <pthread.h>
 
+#define FIN 0x01
+#define SYN 0x02 
+
 typedef enum {
   nat_mapping_icmp,
   nat_mapping_tcp
@@ -14,7 +17,8 @@ typedef enum {
 
 typedef enum{
   tcp_connected,
-  tcp_other
+  tcp_other,
+  tcp_begin
 } current_tcp_conn_state;
 
 typedef enum{
@@ -29,10 +33,10 @@ struct sr_nat_connection {
   current_tcp_conn_state tcp_state;
   uint32_t ip_ext;
   uint16_t aux_ext;
-  uint8_t S_SYN;
-  uint8_t R_SYN;
-  uint8_t S_FIN;
-  uint8_t R_FIN;
+  uint8_t INT_SYN;
+  uint8_t EXT_SYN;
+  uint8_t INT_FIN;
+  uint8_t EXT_FIN;
   struct sr_nat_connection *next;
 };
 
@@ -47,6 +51,14 @@ struct sr_nat_mapping {
   struct sr_nat_mapping *next;
 };
 
+struct sr_unsolicited_pkts {
+	time_t last_updated;
+	uint8_t *packet;
+	char *incoming_interface;
+	unsigned int len;
+	struct sr_unsolicited_pkts *next;
+};
+
 struct sr_nat {
   /* add any fields here */
   struct sr_nat_mapping *mappings;
@@ -55,6 +67,7 @@ struct sr_nat {
   int tcp_trans_timeout;
   uint32_t nat_ext_ip;
   uint32_t last_assigned_aux;
+  struct sr_unsolicited_pkts *unsolicited_pkts;
   struct sr_instance *sr;
     
 
@@ -89,5 +102,6 @@ int sr_nat_modify_packet(struct sr_instance *sr, uint8_t * packet, unsigned int 
 
 pkt_forwarding_dir sr_nat_get_pkt_dir(struct sr_instance *sr, struct sr_ip_hdr *ip_hdr);
 struct sr_if* sr_get_nat_interface_ext(struct sr_instance *sr);
+void sr_nat_tcp_connection_update(struct sr_instance *sr, uint8_t * packet, uint32_t ip_ext, uint16_t aux_ext, struct sr_nat_mapping *mapping, pkt_forwarding_dir pkt_dir);
 
 #endif

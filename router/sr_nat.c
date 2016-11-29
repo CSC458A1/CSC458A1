@@ -147,11 +147,19 @@ void *sr_nat_timeout(void *nat_ptr) {  /* Periodic Timout handling */
     /* handle periodic tasks here */
     struct sr_nat_mapping *current_entry = nat->mappings;
     struct sr_nat_mapping *entry_holder;
+    struct sr_nat_mapping *prev_entry;
     int time_diff;
     while(current_entry){
     	
     	if(current_entry->type == nat_mapping_icmp){
     		time_diff = curtime - current_entry->last_updated;
+    		/*if(!prev_entry){
+    			entry_holder = current_entry;
+    			current_entry = current_entry->next;
+    		}else{
+    			entry_holder = current_entry;
+    			prev_entry->next = current_entry->next;
+    		}*/
     		entry_holder = current_entry;
     		current_entry = current_entry->next;
     		if(time_diff >= nat->icmp_timeout){
@@ -162,28 +170,65 @@ void *sr_nat_timeout(void *nat_ptr) {  /* Periodic Timout handling */
     	
     		struct sr_nat_connection* current_connection = current_entry->conns;
     		struct sr_nat_connection* connection_holder; 
+    		struct sr_nat_connection* prev_connection; 
     		while(current_connection){
     			time_diff = curtime - current_connection->last_updated;
     			if(current_connection->tcp_state == tcp_connected){
     				if(time_diff >= nat->tcp_est_timeout){
     					connection_holder = current_connection;
-    					current_connection = current_connection->next;
+    					/*if(!prev_connection){
+    						current_connection = current_connection->next;	
+    					}else{
+    						prev_connection->next = current_connection->next;
+    					}*/
+						current_connection = current_connection->next;
     					sr_nat_mapping_con_destroy(current_entry, connection_holder);
     				}
     			}else if(current_connection->tcp_state == tcp_other){
-				if(time_diff >= nat->tcp_trans_timeout){
-					connection_holder = current_connection;
-    					current_connection = current_connection->next;
+					if(time_diff >= nat->tcp_trans_timeout){
+						connection_holder = current_connection;
+    					/*if(!prev_connection){
+    						current_connection = current_connection->next;	
+    					}else{
+    						prev_connection->next = current_connection->next;
+    					}*/
+						current_connection = current_connection->next;
     					sr_nat_mapping_con_destroy(current_entry, connection_holder);
-				}	
-			}else{
-				current_connection = current_connection->next;
-			}	
+					}	
+				}else{
+					current_connection = current_connection->next;
+				}
+				
+				/*prev_connection = current_connection;
+				current_connection = current_connection->next;*/
+	
     		}
+    		prev_entry = current_entry;
     		current_entry = current_entry->next;
     		
     	}
 
+    }
+    struct sr_unsolicited_pkts *current_pkt = nat->unsolicited_pkts;
+    struct sr_unsolicited_pkts *prev_pkt;
+    struct sr_unsolicited_pkts *holder_pkt;
+    while(current_pkt){
+    	if((time(NULL) - current_pkt->last_updated) > 6){
+    		send_icmp_pkt(nat->sr, current_pkt->len, current_pkt->packet, ICMP_UNREACHABLE_TYPE, ICMP_PORT_CODE, current_pkt->incoming_interface);
+    		
+    		if(!prev_pkt){
+    			holder_pkt = current_pkt;
+    			current_pkt = current_pkt->next;
+    			free(holder_pkt);
+    		}else{
+    			holder_pkt = current_pkt;
+    			prev_pkt = current_pkt->next;
+    			free(holder_pkt);
+    		}
+    		
+    	}
+    	prev_pkt = current_pkt;
+    	current_pkt = current_pkt->next;
     }
 
     pthread_mutex_unlock(&(nat->lock));
@@ -332,7 +377,23 @@ struct sr_nat_mapping *sr_nat_packet_mapping_lookup(struct sr_instance *sr,
 			printf("incoming port %x\n", port_number);
 			mapping = sr_nat_lookup_external(sr->nat, port_number, type);
 			if(mapping == NULL){
-				/*insolicate....*/
+				/*unsolicite....*/
+				if(!sr->nat->unsolicited_pkts){
+					sr->nat->unsolicited_pkts = (struct sr_unsolicited_pkts *)malloc(sizeof(struct sr_unsolicited_pkts));
+					sr->nat->unsolicited_pkts->packet = packet;
+					sr->nat->unsolicited_pkts->incoming_interface = interface;
+					sr->nat->unsolicited_pkts->len = len;
+					sr->nat->unsolicited_pkts->last_updated = time(NULL);
+				}else{
+					struct sr_unsolicited_pkts *unsolicited_pkt = (struct sr_unsolicited_pkts *)malloc(sizeof(struct sr_unsolicited_pkts));
+					unsolicited_pkt->packet = packet;
+					unsolicited_pkt->incoming_interface = interface;
+					unsolicited_pkt->len = len;
+					unsolicited_pkt->last_updated = time(NULL);
+					unsolicited_pkt->next = sr->nat->unsolicited_pkts;
+					sr->nat->unsolicited_pkts = unsolicited_pkt;
+				}
+				
 			}
 		}
 	
@@ -363,17 +424,17 @@ void sr_nat_tcp_connection_update(struct sr_instance *sr, uint8_t * packet, uint
 
 	pthread_mutex_lock(&(sr->nat->lock));
 	struct sr_nat_mapping *mappings = sr->nat->mappings;
-	struct sr_nat_mapping *mapping_ptr;
+
 	while(mappings){
 		if(mappings->type == mapping-> type && mappings->aux_int == mapping->aux_int && 
 			mappings->ip_int == mapping->ip_int){
-			mapping_ptr = mappings;
+			mapping = mappings;
 			break;
 		}
 		mappings = mappings->next;
 	}
 	
-	struct sr_nat_connection *conns = mapping_ptr;
+	struct sr_nat_connection *conns = mapping->conns;
 	struct sr_nat_connection *conn = NULL;
 	while(conns){
 		if(conns->aux_ext == aux_ext && conns->ip_ext == ip_ext){
@@ -387,19 +448,38 @@ void sr_nat_tcp_connection_update(struct sr_instance *sr, uint8_t * packet, uint
 		conn = (struct sr_nat_connection *)malloc(sizeof(struct sr_nat_connection));
 		conn->ip_ext = ip_ext;
 		conn->aux_ext = aux_ext;
-		conn->S_SYN = 0;
-		conn->R_SYN = 0;
-		conn->S_FIN = 0;
-		conn->R_FIN = 0;
+		conn->INT_SYN = 0;
+		conn->EXT_SYN = 0;
+		conn->INT_FIN = 0;
+		conn->EXT_FIN = 0;
 		conn->last_updated = time(NULL);
-		conn->next = mapping_ptr->conns;
-		mapping_ptr->conns = conn;
+		conn->next = mapping->conns;
+		mapping->conns = conn;
 	}else{
 		conn->last_updated = time(NULL);
 	}
 	
+	struct sr_ip_hdr *ip_hdr = get_ip_header(packet);
+	struct sr_tcp_hdr *tcp_hdr = get_tcp_header(ip_hdr);
 	
 	
+	if(pkt_dir == incoming){
+		if(tcp_hdr->tcp_flag == SYN){
+			conn->EXT_SYN = 1;
+		}
+		if(tcp_hdr->tcp_flag == FIN){
+			conn->EXT_FIN = 1;
+		}
+	}
+	
+	if(pkt_dir == incoming){
+		if(tcp_hdr->tcp_flag == SYN){
+			conn->INT_SYN = 1;
+		}
+		if(tcp_hdr->tcp_flag == FIN){
+			conn->INT_FIN = 1;
+		}
+	}
 	
 	
 	pthread_mutex_unlock(&(sr->nat->lock));
