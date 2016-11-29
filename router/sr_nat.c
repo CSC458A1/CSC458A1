@@ -154,7 +154,7 @@ void *sr_nat_timeout(void *nat_ptr) {  /* Periodic Timout handling */
     		time_diff = curtime - current_entry->last_updated;
     		entry_holder = current_entry;
     		current_entry = current_entry->next;
-    		if(time_diff > nat->icmp_timeout){
+    		if(time_diff >= nat->icmp_timeout){
     			sr_nat_mapping_destroy(nat, entry_holder);
     		}
     		
@@ -165,12 +165,20 @@ void *sr_nat_timeout(void *nat_ptr) {  /* Periodic Timout handling */
     		while(current_connection){
     			time_diff = curtime - current_connection->last_updated;
     			if(current_connection->tcp_state == tcp_connected){
-    				if(time_diff > nat->tcp_est_timeout){
+    				if(time_diff >= nat->tcp_est_timeout){
     					connection_holder = current_connection;
     					current_connection = current_connection->next;
     					sr_nat_mapping_con_destroy(current_entry, connection_holder);
     				}
-    			}
+    			}else if(current_connection->tcp_state == tcp_other){
+				if(time_diff >= nat->tcp_trans_timeout){
+					connection_holder = current_connection;
+    					current_connection = current_connection->next;
+    					sr_nat_mapping_con_destroy(current_entry, connection_holder);
+				}	
+			}else{
+				current_connection = current_connection->next;
+			}	
     		}
     		current_entry = current_entry->next;
     		
