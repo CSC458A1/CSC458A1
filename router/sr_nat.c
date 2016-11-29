@@ -35,6 +35,7 @@ int sr_nat_init(struct sr_nat *nat) { /* Initializes the nat */
   nat->mappings = NULL;
   /* Initialize any variables here */
   nat->last_assigned_aux = 1023;
+  nat->unsolicited_pkts = NULL;
   return success;
 }
 
@@ -229,7 +230,7 @@ void sr_nat_send_icmp(struct sr_nat *nat){
     struct sr_unsolicited_pkts *prev_pkt = NULL;
     struct sr_unsolicited_pkts *holder_pkt = NULL;
     while(current_pkt){
-    	if(difftime(time(NULL), current_pkt->last_updated) >= 6){
+    	if(difftime(time(NULL), current_pkt->last_updated) > 6){
     		printf("aaaaaaaa %x\n", current_pkt->aux_ext);
 
     		send_icmp_pkt(nat->sr, current_pkt->len, current_pkt->packet, ICMP_UNREACHABLE_TYPE, ICMP_PORT_CODE, current_pkt->incoming_interface);
@@ -398,6 +399,7 @@ struct sr_nat_mapping *sr_nat_packet_mapping_lookup(struct sr_instance *sr,
 				pthread_mutex_lock(&(sr->nat->lock));
 				/*unsolicite....*/
 				if(sr->nat->unsolicited_pkts == NULL){
+					printf("empty que\n");
 					sr->nat->unsolicited_pkts = (struct sr_unsolicited_pkts *)malloc(sizeof(struct sr_unsolicited_pkts));
 					sr->nat->unsolicited_pkts->packet = (uint8_t *)malloc(len);
 					memcpy(sr->nat->unsolicited_pkts->packet, packet, len);
@@ -408,6 +410,7 @@ struct sr_nat_mapping *sr_nat_packet_mapping_lookup(struct sr_instance *sr,
 					sr->nat->unsolicited_pkts->ip_ext = ip_hdr->ip_src;
 					sr->nat->unsolicited_pkts->aux_ext = tcp_hdr->tcp_port_src; 
 				}else{
+					printf("not empty que\n");
 					struct sr_unsolicited_pkts *unsolicited_pkts = sr->nat->unsolicited_pkts;
 					struct sr_unsolicited_pkts *same_pkt;
 					while(unsolicited_pkts){
@@ -556,6 +559,11 @@ int sr_nat_modify_packet(struct sr_instance *sr,
 	pkt_forwarding_dir pkt_dir = sr_nat_get_pkt_dir(sr, ip_hdr);
 	
 	if(pkt_dir == external){
+		printf("external\n");
+		return 0;
+	}
+	
+	if(pkt_dir == internal && ip_hdr->ip_p == ip_protocol_icmp){
 		return 0;
 	}
 	
@@ -631,6 +639,7 @@ pkt_forwarding_dir sr_nat_get_pkt_dir(struct sr_instance *sr,
 		is_src_int = -1;
 	}else{
 		if(strncmp(routing_src->interface, "eth1", 4) == 0){
+
 			is_src_int = 1;
 		}
 	}
@@ -642,7 +651,12 @@ pkt_forwarding_dir sr_nat_get_pkt_dir(struct sr_instance *sr,
 			is_dst_int = 1;
 		}
 	}
-
+	
+	printf("interal src %d, insteral dst %d\n", is_src_int, is_dst_int);
+	if(is_src_int && is_dst_int < 0){
+		printf("interal\n");
+		return internal;
+	}
 	
 	struct sr_if *ext_if = sr_get_nat_interface_ext(sr);
 	if(!is_src_int && ext_if->ip == ip_hdr->ip_dst){
@@ -651,10 +665,6 @@ pkt_forwarding_dir sr_nat_get_pkt_dir(struct sr_instance *sr,
 	}
 	if(is_src_int && ext_if->ip != ip_hdr->ip_dst){
 		return outgoing;
-	}
-	
-	if(is_src_int && is_dst_int){
-		return internal;
 	}
 	
 	return external;
