@@ -214,13 +214,18 @@ void *sr_nat_timeout(void *nat_ptr) {  /* Periodic Timout handling */
     struct sr_unsolicited_pkts *holder_pkt;
     while(current_pkt){
     	if(difftime(time(NULL), current_pkt->last_updated) > 6){
+    		printf("aaaaaaaa %x\n", current_pkt->aux_ext);
+
     		send_icmp_pkt(nat->sr, current_pkt->len, current_pkt->packet, ICMP_UNREACHABLE_TYPE, ICMP_PORT_CODE, current_pkt->incoming_interface);
     		holder_pkt = current_pkt;
     		if(!prev_pkt){
+    			printf("b\n");
     			current_pkt = current_pkt->next;
     			nat->unsolicited_pkts = current_pkt;
     		}else{
+    			printf("a\n");
     			prev_pkt->next = current_pkt->next;
+    			current_pkt = current_pkt->next;
     		}
     		free(holder_pkt->packet);
     		free(holder_pkt);
@@ -376,11 +381,12 @@ struct sr_nat_mapping *sr_nat_packet_mapping_lookup(struct sr_instance *sr,
 			port_number = tcp_hdr->tcp_port_dst;
 			printf("incoming port %x\n", port_number);
 			mapping = sr_nat_lookup_external(sr->nat, port_number, type);
-			if(mapping == NULL){
+			if(mapping == NULL && tcp_hdr->tcp_flag == SYN){
 				pthread_mutex_lock(&(sr->nat->lock));
 				/*unsolicite....*/
 				if(!sr->nat->unsolicited_pkts){
 					sr->nat->unsolicited_pkts = (struct sr_unsolicited_pkts *)malloc(sizeof(struct sr_unsolicited_pkts));
+					sr->nat->unsolicited_pkts->packet = (uint8_t *)malloc(len);
 					memcpy(sr->nat->unsolicited_pkts->packet, packet, len);
 
 					sr->nat->unsolicited_pkts->incoming_interface = interface;
@@ -390,6 +396,7 @@ struct sr_nat_mapping *sr_nat_packet_mapping_lookup(struct sr_instance *sr,
 					sr->nat->unsolicited_pkts->aux_ext = tcp_hdr->tcp_port_src; 
 				}else{
 					struct sr_unsolicited_pkts *unsolicited_pkt = (struct sr_unsolicited_pkts *)malloc(sizeof(struct sr_unsolicited_pkts));
+					unsolicited_pkt->packet = (uint8_t *)malloc(len);
 					memcpy(unsolicited_pkt->packet, packet, len);
 
 					unsolicited_pkt->incoming_interface = interface;
@@ -401,6 +408,7 @@ struct sr_nat_mapping *sr_nat_packet_mapping_lookup(struct sr_instance *sr,
 					sr->nat->unsolicited_pkts = unsolicited_pkt;
 					
 				}
+				printf("bbbbbbb %x\n", tcp_hdr->tcp_port_src);
 				pthread_mutex_unlock(&(sr->nat->lock));
 			}
 		}
@@ -428,7 +436,6 @@ struct sr_nat_mapping *sr_nat_packet_mapping_lookup(struct sr_instance *sr,
 						}else{
 							prev_pkt->next = unsolicited_pkt->next;
 						}
-						free(holder_pkt);
 					}else{
 						prev_pkt = unsolicited_pkt;
 						unsolicited_pkt = unsolicited_pkt->next;
