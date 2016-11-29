@@ -27,14 +27,12 @@ struct sr_nat_connection {
   /* add TCP connection state data members here */
   time_t last_updated;
   current_tcp_conn_state tcp_state;
-  uint32_t scr_ip;
-  uint32_t dst_ip;
-  uint16_t interal;
-  uint16_t external;
+  uint32_t ip_ext;
+  uint16_t aux_ext;
   uint8_t S_SYN;
   uint8_t R_SYN;
   uint8_t S_FIN;
-  uint8_t S_FIN
+  uint8_t S_FIN;
   struct sr_nat_connection *next;
 };
 

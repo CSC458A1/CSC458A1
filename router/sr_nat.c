@@ -299,25 +299,105 @@ struct sr_nat_mapping *sr_nat_packet_mapping_lookup(struct sr_instance *sr,
 		icmp_hdr = get_icmp_header(ip_hdr);
 		type = nat_mapping_icmp;
 		port_number = icmp_hdr->icmp_id;
-	}
+		if(pkt_dir == incoming){
+			printf("incoming port %x\n", port_number);
+			mapping = sr_nat_lookup_external(sr->nat, port_number, type);
+		}
 	
-	if(pkt_dir == incoming){
-		printf("incoming port %x\n", port_number);
-		mapping = sr_nat_lookup_external(sr->nat, port_number, type);
-		if(mapping == NULL){
+		if(pkt_dir == outgoing){
+			mapping = sr_nat_lookup_internal(sr->nat, ip_hdr->ip_src, port_number, type);
+			if(mapping == NULL){
+				mapping = sr_nat_insert_mapping(sr->nat, ip_hdr->ip_src, port_number, type);
+			}
+		}
+	}
+	if(ip_hdr->ip_p == ip_protocol_tcp){
+		struct sr_tcp_hdr *tcp_hdr;
+		tcp_hdr = get_tcp_header(ip_hdr);
+		type = nat_mapping_tcp;
+		uint32_t ip_ext;
+		uint16_t aux_ext;
+		if(pkt_dir == incoming){
+			ip_ext = ip_hdr->ip_src;
+			aux_ext = tcp_hdr->tcp_port_src;			
+			port_number = tcp_hdr->tcp_port_dst;
+			tcp_ip = ip_hdr->ip_dst;
+			printf("incoming port %x\n", port_number);
+			mapping = sr_nat_lookup_external(sr->nat, port_number, type);
+			if(mapping == NULL){
+				/*insolicate....*/
+			}
+		}
+	
+		if(pkt_dir == outgoing){
+			ip_ext = ip_hdr->ip_dst;
+			aux_ext = tcp_hdr->tcp_port_dst;
+			port_number = tcp_hdr->tcp_port_src;
+			tcp_ip = ip_hdr->ip_src;
+			mapping = sr_nat_lookup_internal(sr->nat, ip_hdr->ip_src, port_number, type);
+			if(mapping == NULL){
+				mapping = sr_nat_insert_mapping(sr->nat, ip_hdr->ip_src, port_number, type);
+			}
+		}
 		
+		if(mapping != NULL){
+
+				
+			sr_nat_tcp_connection_update(sr, packet, ip_ext, aux_ext, mapping, pkt_dir);
 		}
-	}
-	
-	if(pkt_dir == outgoing){
-		mapping = sr_nat_lookup_internal(sr->nat, ip_hdr->ip_src, port_number, type);
-		if(mapping == NULL){
-			mapping = sr_nat_insert_mapping(sr->nat, ip_hdr->ip_src, port_number, type);
-		}
-	}
+			
+	}	
 	
 	return mapping;
 	
+}
+
+
+void sr_nat_tcp_connection_update(struct sr_instance *sr, uint8_t * packet, uint32_t ip_ext, uint16_t aux_ext, struct sr_nat_mapping *mapping, pkt_forwarding_dir pkt_dir){
+
+	pthread_mutex_lock(&(sr->nat->lock));
+	struct sr_nat_mapping *mappings = sr->nat->mappings;
+	struct sr_nat_mapping *mapping_ptr;
+	while(mappings){
+		if(mappings->type == mapping-> type && mappings->aux_int == mapping->aux_int && 
+			mappings->ip_int == mapping->ip_int){
+			mapping_ptr = mappings;
+			break;
+		}
+		mappings = mappings->next;
+	}
+	
+	struct sr_nat_connection *conns = mapping_ptr;
+	struct sr_nat_connection *conn = NULL;
+	while(conns){
+		if(conns->aux_ext == aux_ext && conns->ip_ext == ip_ext){
+			conn = conns;
+			break;
+		}
+		conns = conns->next;
+	}
+	
+	if(!conn){
+		conn = (struct sr_nat_connection *)malloc(sizeof(struct sr_nat_connection));
+		conn->ip_ext = ip_ext;
+		conn->aux_ext = aux_ext;
+		conn->S_SYN = 0;
+		conn->R_SYN = 0;
+		conn->S_FIN = 0;
+		conn->R_FIN = 0;
+		conn->tcp_state = NULL;
+		conn->last_updated = time(NULL);
+		conn->next = mapping_ptr->conns;
+		mapping_ptr->conns = conn;
+	}else{
+		conn->last_updated = time(NULL);
+	}
+	
+	
+	
+	
+	
+	pthread_mutex_unlock(&(sr->nat->lock));
 }
 
 int sr_nat_modify_packet(struct sr_instance *sr,
@@ -336,6 +416,7 @@ int sr_nat_modify_packet(struct sr_instance *sr,
 	printf("incoming finding end\n");
 	struct sr_nat_mapping *mapping = sr_nat_packet_mapping_lookup(sr, packet, len, interface, pkt_dir);
 	printf("mapping finding end\n");
+	
 	if(mapping == NULL){
 		printf("no mapping found\n");
 		if(ip_hdr->ip_p == ip_protocol_icmp){
@@ -362,6 +443,26 @@ int sr_nat_modify_packet(struct sr_instance *sr,
 		
 		icmp_hdr->icmp_sum = 0;
 		icmp_hdr->icmp_sum = cksum(icmp_hdr, ntohs(ip_hdr->ip_len) - ip_hdr->ip_hl*4);
+	}
+	
+	if(ip_hdr->ip_p == ip_protocol_tcp){
+	
+		struct sr_tcp_hdr *tcp_hdr;
+		tcp_hdr = get_tcp_header(ip_hdr);
+		if(pkt_dir == incoming){
+			printf("incoming tcp\n");
+
+			ip_hdr->ip_dst = mapping->ip_int;
+			tcp_hdr->tcp_port_dst = mapping->aux_int;		
+		}else if(pkt_dir == outgoing){
+			printf("outgoing tcp\n");
+
+			ip_hdr->ip_src = mapping->ip_ext;
+			tcp_hdr->tcp_port_src = mapping->aux_ext;
+		}
+		
+		tcp_hdr->icmp_sum = 0;
+		tcp_hdr->icmp_sum = cksum(tcp_hdr, ntohs(ip_hdr->ip_len) - ip_hdr->ip_hl*4);
 	}
 	
 	ip_hdr->ip_sum = 0;
