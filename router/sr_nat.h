@@ -32,7 +32,7 @@ struct sr_nat_connection {
   uint8_t S_SYN;
   uint8_t R_SYN;
   uint8_t S_FIN;
-  uint8_t S_FIN;
+  uint8_t R_FIN;
   struct sr_nat_connection *next;
 };
 

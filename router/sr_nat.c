@@ -321,7 +321,6 @@ struct sr_nat_mapping *sr_nat_packet_mapping_lookup(struct sr_instance *sr,
 			ip_ext = ip_hdr->ip_src;
 			aux_ext = tcp_hdr->tcp_port_src;			
 			port_number = tcp_hdr->tcp_port_dst;
-			tcp_ip = ip_hdr->ip_dst;
 			printf("incoming port %x\n", port_number);
 			mapping = sr_nat_lookup_external(sr->nat, port_number, type);
 			if(mapping == NULL){
@@ -333,7 +332,6 @@ struct sr_nat_mapping *sr_nat_packet_mapping_lookup(struct sr_instance *sr,
 			ip_ext = ip_hdr->ip_dst;
 			aux_ext = tcp_hdr->tcp_port_dst;
 			port_number = tcp_hdr->tcp_port_src;
-			tcp_ip = ip_hdr->ip_src;
 			mapping = sr_nat_lookup_internal(sr->nat, ip_hdr->ip_src, port_number, type);
 			if(mapping == NULL){
 				mapping = sr_nat_insert_mapping(sr->nat, ip_hdr->ip_src, port_number, type);
@@ -385,7 +383,6 @@ void sr_nat_tcp_connection_update(struct sr_instance *sr, uint8_t * packet, uint
 		conn->R_SYN = 0;
 		conn->S_FIN = 0;
 		conn->R_FIN = 0;
-		conn->tcp_state = NULL;
 		conn->last_updated = time(NULL);
 		conn->next = mapping_ptr->conns;
 		mapping_ptr->conns = conn;
@@ -461,8 +458,8 @@ int sr_nat_modify_packet(struct sr_instance *sr,
 			tcp_hdr->tcp_port_src = mapping->aux_ext;
 		}
 		
-		tcp_hdr->icmp_sum = 0;
-		tcp_hdr->icmp_sum = cksum(tcp_hdr, ntohs(ip_hdr->ip_len) - ip_hdr->ip_hl*4);
+		tcp_hdr->tcp_sum = 0;
+		tcp_hdr->tcp_sum = cksum(tcp_hdr, ntohs(ip_hdr->ip_len) - ip_hdr->ip_hl*4);
 	}
 	
 	ip_hdr->ip_sum = 0;

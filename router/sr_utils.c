@@ -35,6 +35,10 @@ struct sr_icmp_hdr *get_icmp_header(struct sr_ip_hdr *ip_hdr){
 	return (struct sr_icmp_hdr *)((uint8_t *)ip_hdr + ip_hdr->ip_hl * 4);
 }
 
+struct sr_tcp_hdr *get_tcp_header(struct sr_ip_hdr *ip_hdr){
+	return (struct sr_tcp_hdr *)((uint8_t *)ip_hdr + ip_hdr->ip_hl * 4);
+}
+
 struct sr_ip_hdr *get_ip_header(uint8_t *buf){
 	return (struct sr_ip_hdr *)(buf + sizeof(struct sr_ethernet_hdr));
 }
