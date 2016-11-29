@@ -56,6 +56,8 @@ struct sr_unsolicited_pkts {
 	uint8_t *packet;
 	char *incoming_interface;
 	unsigned int len;
+	uint32_t ip_ext;
+	uint16_t aux_ext;
 	struct sr_unsolicited_pkts *next;
 };
 

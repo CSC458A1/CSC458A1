@@ -35,9 +35,6 @@ int sr_nat_init(struct sr_nat *nat) { /* Initializes the nat */
   nat->mappings = NULL;
   /* Initialize any variables here */
   nat->last_assigned_aux = 1023;
-
-  
-
   return success;
 }
 
@@ -153,13 +150,14 @@ void *sr_nat_timeout(void *nat_ptr) {  /* Periodic Timout handling */
     	
     	if(current_entry->type == nat_mapping_icmp){
     		time_diff = curtime - current_entry->last_updated;
-    		/*if(!prev_entry){
+    		if(!prev_entry){
     			entry_holder = current_entry;
     			current_entry = current_entry->next;
+    			nat->mappings = current_entry;
     		}else{
     			entry_holder = current_entry;
     			prev_entry->next = current_entry->next;
-    		}*/
+    		}
     		entry_holder = current_entry;
     		current_entry = current_entry->next;
     		if(time_diff >= nat->icmp_timeout){
@@ -176,31 +174,33 @@ void *sr_nat_timeout(void *nat_ptr) {  /* Periodic Timout handling */
     			if(current_connection->tcp_state == tcp_connected){
     				if(time_diff >= nat->tcp_est_timeout){
     					connection_holder = current_connection;
-    					/*if(!prev_connection){
+    					if(!prev_connection){
     						current_connection = current_connection->next;	
+    						current_entry->conns = current_connection;
     					}else{
     						prev_connection->next = current_connection->next;
-    					}*/
+    					}
 						current_connection = current_connection->next;
     					sr_nat_mapping_con_destroy(current_entry, connection_holder);
     				}
     			}else if(current_connection->tcp_state == tcp_other){
 					if(time_diff >= nat->tcp_trans_timeout){
 						connection_holder = current_connection;
-    					/*if(!prev_connection){
+    					if(!prev_connection){
     						current_connection = current_connection->next;	
+    						current_entry->conns = current_connection;
     					}else{
     						prev_connection->next = current_connection->next;
-    					}*/
+    					}
 						current_connection = current_connection->next;
     					sr_nat_mapping_con_destroy(current_entry, connection_holder);
 					}	
-				}else{
+				}/*else{
 					current_connection = current_connection->next;
-				}
+				}*/
 				
-				/*prev_connection = current_connection;
-				current_connection = current_connection->next;*/
+				prev_connection = current_connection;
+				current_connection = current_connection->next;
 	
     		}
     		prev_entry = current_entry;
@@ -213,22 +213,22 @@ void *sr_nat_timeout(void *nat_ptr) {  /* Periodic Timout handling */
     struct sr_unsolicited_pkts *prev_pkt;
     struct sr_unsolicited_pkts *holder_pkt;
     while(current_pkt){
-    	if((time(NULL) - current_pkt->last_updated) > 6){
+    	if(difftime(time(NULL), current_pkt->last_updated) > 6){
     		send_icmp_pkt(nat->sr, current_pkt->len, current_pkt->packet, ICMP_UNREACHABLE_TYPE, ICMP_PORT_CODE, current_pkt->incoming_interface);
-    		
+    		holder_pkt = current_pkt;
     		if(!prev_pkt){
-    			holder_pkt = current_pkt;
     			current_pkt = current_pkt->next;
-    			free(holder_pkt);
+    			nat->unsolicited_pkts = current_pkt;
     		}else{
-    			holder_pkt = current_pkt;
-    			prev_pkt = current_pkt->next;
-    			free(holder_pkt);
+    			prev_pkt->next = current_pkt->next;
     		}
+    		free(holder_pkt->packet);
+    		free(holder_pkt);
     		
+    	}else{
+    		prev_pkt = current_pkt;
+    		current_pkt = current_pkt->next;
     	}
-    	prev_pkt = current_pkt;
-    	current_pkt = current_pkt->next;
     }
 
     pthread_mutex_unlock(&(nat->lock));
@@ -377,23 +377,31 @@ struct sr_nat_mapping *sr_nat_packet_mapping_lookup(struct sr_instance *sr,
 			printf("incoming port %x\n", port_number);
 			mapping = sr_nat_lookup_external(sr->nat, port_number, type);
 			if(mapping == NULL){
+				pthread_mutex_lock(&(sr->nat->lock));
 				/*unsolicite....*/
 				if(!sr->nat->unsolicited_pkts){
 					sr->nat->unsolicited_pkts = (struct sr_unsolicited_pkts *)malloc(sizeof(struct sr_unsolicited_pkts));
-					sr->nat->unsolicited_pkts->packet = packet;
+					memcpy(sr->nat->unsolicited_pkts->packet, packet, len);
+
 					sr->nat->unsolicited_pkts->incoming_interface = interface;
 					sr->nat->unsolicited_pkts->len = len;
 					sr->nat->unsolicited_pkts->last_updated = time(NULL);
+					sr->nat->unsolicited_pkts->ip_ext = ip_hdr->ip_src;
+					sr->nat->unsolicited_pkts->aux_ext = tcp_hdr->tcp_port_src; 
 				}else{
 					struct sr_unsolicited_pkts *unsolicited_pkt = (struct sr_unsolicited_pkts *)malloc(sizeof(struct sr_unsolicited_pkts));
-					unsolicited_pkt->packet = packet;
+					memcpy(unsolicited_pkt->packet, packet, len);
+
 					unsolicited_pkt->incoming_interface = interface;
 					unsolicited_pkt->len = len;
 					unsolicited_pkt->last_updated = time(NULL);
+					unsolicited_pkt->ip_ext = ip_hdr->ip_src;
+					unsolicited_pkt->aux_ext = tcp_hdr->tcp_port_src;
 					unsolicited_pkt->next = sr->nat->unsolicited_pkts;
 					sr->nat->unsolicited_pkts = unsolicited_pkt;
+					
 				}
-				
+				pthread_mutex_unlock(&(sr->nat->lock));
 			}
 		}
 	
@@ -405,11 +413,32 @@ struct sr_nat_mapping *sr_nat_packet_mapping_lookup(struct sr_instance *sr,
 			if(mapping == NULL){
 				mapping = sr_nat_insert_mapping(sr->nat, ip_hdr->ip_src, port_number, type);
 			}
+			
+			if(tcp_hdr->tcp_flag == SYN){
+				pthread_mutex_lock(&(sr->nat->lock));
+				struct sr_unsolicited_pkts *unsolicited_pkt = sr->nat->unsolicited_pkts;
+				struct sr_unsolicited_pkts *prev_pkt;
+				struct sr_unsolicited_pkts *holder_pkt;
+				while(unsolicited_pkt){
+					if(unsolicited_pkt->ip_ext == ip_ext && unsolicited_pkt->ip_ext == aux_ext){
+						holder_pkt = unsolicited_pkt;
+						if(!prev_pkt){
+							unsolicited_pkt = unsolicited_pkt->next;
+							sr->nat->unsolicited_pkts = unsolicited_pkt;
+						}else{
+							prev_pkt->next = unsolicited_pkt->next;
+						}
+						free(holder_pkt);
+					}else{
+						prev_pkt = unsolicited_pkt;
+						unsolicited_pkt = unsolicited_pkt->next;
+					}
+				}
+				pthread_mutex_unlock(&(sr->nat->lock));
+			}
 		}
 		
 		if(mapping != NULL){
-
-				
 			sr_nat_tcp_connection_update(sr, packet, ip_ext, aux_ext, mapping, pkt_dir);
 		}
 			
