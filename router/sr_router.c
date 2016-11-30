@@ -150,7 +150,8 @@ void process_ip_pkt(struct sr_instance* sr,
 		printf("not valid ip packet\n");
 		return;	
 	}
-	
+    struct sr_tcp_hdr *tcp_hdr;
+    tcp_hdr = get_tcp_header(ip_hdr);
 	print_hdr_ip((uint8_t *)ip_hdr);
 	longest_prefix_match = sr_rtable_lookup(sr, ip_hdr->ip_dst);
 	
@@ -161,8 +162,9 @@ void process_ip_pkt(struct sr_instance* sr,
 			send_icmp_pkt(sr, len, packet, ICMP_ECHO_REPLY_CODE, 0, incoming_interface);
 		}else{
 			printf("icmp 3 port unreachable\n");
-
-			send_icmp_pkt(sr, len, packet, ICMP_UNREACHABLE_TYPE, ICMP_PORT_CODE, incoming_interface);
+            if (sr->nat_enabled == 0){
+			 send_icmp_pkt(sr, len, packet, ICMP_UNREACHABLE_TYPE, ICMP_PORT_CODE, incoming_interface);
+            } 
 			return;
 		}	
 	}else{

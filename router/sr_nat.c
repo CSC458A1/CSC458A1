@@ -246,7 +246,7 @@ void sr_nat_send_icmp(struct sr_nat *nat){
 		struct sr_rt *routing_src = sr_rtable_lookup(nat->sr, ip_hdr->ip_src);
 		
 		
-    	if(difftime(time(NULL), current_pkt->last_updated) > 6 && tcp_hdr->tcp_port_dst >= 1024){
+    	if(difftime(time(NULL), current_pkt->last_updated) > 6 && htons(tcp_hdr->tcp_port_dst) >= 1024){
 
 
     		send_icmp_pkt(nat->sr, current_pkt->len, current_pkt->packet, ICMP_UNREACHABLE_TYPE, ICMP_PORT_CODE, current_pkt->incoming_interface);
@@ -264,13 +264,13 @@ void sr_nat_send_icmp(struct sr_nat *nat){
     		free(holder_pkt->packet);
     		free(holder_pkt);
     		
-    	}else if(tcp_hdr->tcp_port_dst < 1024){
+    	}/*else if(tcp_hdr->tcp_port_dst < 1024){
 			send_icmp_pkt(nat->sr, current_pkt->len, current_pkt->packet, ICMP_UNREACHABLE_TYPE, ICMP_PORT_CODE, current_pkt->incoming_interface);
 			holder_pkt = current_pkt;
     		if(!prev_pkt){
 
     			/*current_pkt = current_pkt->next;*/
-    			nat->unsolicited_pkts = current_pkt->next;
+    			/*nat->unsolicited_pkts = current_pkt->next;
     			current_pkt = current_pkt->next;
     		}else{
 
@@ -280,7 +280,7 @@ void sr_nat_send_icmp(struct sr_nat *nat){
     		free(holder_pkt->packet);
     		free(holder_pkt);	
 				
-		}else{
+		}*/else{
     		prev_pkt = current_pkt;
     		current_pkt = current_pkt->next;
     	}
@@ -429,7 +429,10 @@ struct sr_nat_mapping *sr_nat_packet_mapping_lookup(struct sr_instance *sr,
 			printf("incoming port %x\n", port_number);
 			mapping = sr_nat_lookup_external(sr->nat, port_number, type);
 			if(mapping == NULL){
-			  if(tcp_hdr->tcp_flag & SYN){	
+			  if(tcp_hdr->tcp_flag & SYN){
+                  if (htons(tcp_hdr->tcp_port_dst) < 1024) {
+                      send_icmp_pkt(sr, len, packet, ICMP_UNREACHABLE_TYPE, ICMP_PORT_CODE, interface);
+                  } else {
 				pthread_mutex_lock(&(sr->nat->lock));
 				struct sr_unsolicited_pkts *unsolicited = sr->nat->unsolicited_pkts;
 				/*unsolicite....*/
@@ -474,6 +477,7 @@ struct sr_nat_mapping *sr_nat_packet_mapping_lookup(struct sr_instance *sr,
 				}
 
 				pthread_mutex_unlock(&(sr->nat->lock));
+                  }
 			  }	
 			}
 		}
@@ -608,6 +612,7 @@ void sr_nat_modify_packet(struct sr_instance *sr,
 	
 	if(pkt_dir == int_ext_only){
 		printf("external internal\n");
+        send_icmp_pkt(sr, len, packet, ICMP_UNREACHABLE_TYPE, ICMP_PORT_CODE, interface);
 		return;
 	}
 	
