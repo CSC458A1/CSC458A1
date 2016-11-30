@@ -47,13 +47,13 @@ void handle_arpreq(struct sr_arpreq *req, struct sr_instance *sr) {
         arp_hdr->ar_op = htons(arp_op_request);
         memcpy(arp_hdr->ar_sha, dst_interface->addr, ETHER_ADDR_LEN);
         arp_hdr->ar_sip = dst_interface->ip;
-        uint8_t broadcastArpAddr[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00}; 
-        memcpy(arp_hdr->ar_tha, broadcastArpAddr, ETHER_ADDR_LEN);
+        uint8_t broadcast_arp_addr[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00}; 
+        memcpy(arp_hdr->ar_tha, broadcast_arp_addr, ETHER_ADDR_LEN);
         arp_hdr->ar_tip = req->ip;
         
         sr_ethernet_hdr_t *ehdr   = (sr_ethernet_hdr_t *) arp_req_pkt;
-        uint8_t broadcastAddr[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
-        memcpy(ehdr->ether_dhost, broadcastAddr, ETHER_ADDR_LEN);
+        uint8_t broadcast_addr[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+        memcpy(ehdr->ether_dhost, broadcast_addr, ETHER_ADDR_LEN);
         memcpy(ehdr->ether_shost, dst_interface->addr, ETHER_ADDR_LEN);
        	ehdr->ether_type = htons(ethertype_arp);
 

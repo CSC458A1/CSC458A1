@@ -102,11 +102,8 @@ void sr_handlepacket(struct sr_instance* sr,
   
     if (ethertype(packet) == ethertype_ip) {
     	if(sr->nat_enabled == 1){
-    		int fail = sr_nat_modify_packet(sr, packet, len, interface);
-    		if(fail == 1){
-    			printf("fail\n");
-    			return;
-    		}
+			sr_nat_modify_packet(sr, packet, len, interface);
+  
     	}
         process_ip_pkt(sr, packet, len, interface);
         

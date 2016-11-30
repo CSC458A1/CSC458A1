@@ -34,7 +34,7 @@ int sr_nat_init(struct sr_nat *nat) { /* Initializes the nat */
 
   nat->mappings = NULL;
   /* Initialize any variables here */
-  nat->last_assigned_aux = 1023;
+  nat->last_assigned_aux = 1024;
   nat->unsolicited_pkts = NULL;
   return success;
 }
@@ -148,29 +148,35 @@ void *sr_nat_timeout(void *nat_ptr) {  /* Periodic Timout handling */
     pthread_mutex_lock(&(nat->lock));
 
     time_t curtime = time(NULL);
-	sr_nat_send_icmp(nat);
+	
     /* handle periodic tasks here */
     struct sr_nat_mapping *current_entry = nat->mappings;
-    struct sr_nat_mapping *entry_holder;
-    struct sr_nat_mapping *prev_entry;
+    struct sr_nat_mapping *entry_holder = NULL;
+    struct sr_nat_mapping *prev_entry = NULL;
     int time_diff;
     while(current_entry){
     	
     	if(current_entry->type == nat_mapping_icmp){
     		time_diff = curtime - current_entry->last_updated;
-    		if(!prev_entry){
-    			entry_holder = current_entry;
-    			current_entry = current_entry->next;
-    			nat->mappings = current_entry;
-    		}else{
-    			entry_holder = current_entry;
-    			prev_entry->next = current_entry->next;
-    		}
-    		entry_holder = current_entry;
-    		current_entry = current_entry->next;
+    		
+    		/*entry_holder = current_entry;
+    		current_entry = current_entry->next;*/
     		if(time_diff >= nat->icmp_timeout){
-    			sr_nat_mapping_destroy(nat, entry_holder);
-    		}
+    			
+				if(!prev_entry){
+    				entry_holder = current_entry;
+    				current_entry = current_entry->next;
+    				nat->mappings = current_entry;
+    			}else{
+    				entry_holder = current_entry;
+    				prev_entry->next = current_entry->next;
+					current_entry = current_entry->next;
+    			}
+				sr_nat_mapping_destroy(nat, entry_holder);
+    		}else{
+				prev_entry = current_entry;
+				current_entry = current_entry->next;		
+			}
     		
     	}else if(current_entry->type == nat_mapping_tcp){
     	
@@ -187,8 +193,9 @@ void *sr_nat_timeout(void *nat_ptr) {  /* Periodic Timout handling */
     						current_entry->conns = current_connection;
     					}else{
     						prev_connection->next = current_connection->next;
+							current_connection = current_connection->next;
     					}
-						current_connection = current_connection->next;
+						
     					sr_nat_mapping_con_destroy(current_entry, connection_holder);
     				}
     			}else if(current_connection->tcp_state == tcp_other){
@@ -199,26 +206,27 @@ void *sr_nat_timeout(void *nat_ptr) {  /* Periodic Timout handling */
     						current_entry->conns = current_connection;
     					}else{
     						prev_connection->next = current_connection->next;
+							current_connection = current_connection->next;
     					}
-						current_connection = current_connection->next;
+						
     					sr_nat_mapping_con_destroy(current_entry, connection_holder);
 					}	
-				}/*else{
+				}else{
+					prev_connection = current_connection;
 					current_connection = current_connection->next;
-				}*/
-				
-				prev_connection = current_connection;
-				current_connection = current_connection->next;
+				}
 	
     		}
     		prev_entry = current_entry;
     		current_entry = current_entry->next;
     		
     	}
+		
+		
 
     }
     
-
+	sr_nat_send_icmp(nat);
     pthread_mutex_unlock(&(nat->lock));
   }
   return NULL;
@@ -229,26 +237,50 @@ void sr_nat_send_icmp(struct sr_nat *nat){
 	struct sr_unsolicited_pkts *current_pkt = nat->unsolicited_pkts;
     struct sr_unsolicited_pkts *prev_pkt = NULL;
     struct sr_unsolicited_pkts *holder_pkt = NULL;
+	
     while(current_pkt){
-    	if(difftime(time(NULL), current_pkt->last_updated) > 6){
-    		printf("aaaaaaaa %x\n", current_pkt->aux_ext);
+		uint8_t *packet = current_pkt->packet;
+		struct sr_ip_hdr *ip_hdr = get_ip_header(packet);
+		struct sr_tcp_hdr *tcp_hdr = get_tcp_header(ip_hdr);
+		struct sr_rt *routing_dst = sr_rtable_lookup(nat->sr, ip_hdr->ip_dst);
+		struct sr_rt *routing_src = sr_rtable_lookup(nat->sr, ip_hdr->ip_src);
+		
+		
+    	if(difftime(time(NULL), current_pkt->last_updated) > 6 && tcp_hdr->tcp_port_dst >= 1024){
+
 
     		send_icmp_pkt(nat->sr, current_pkt->len, current_pkt->packet, ICMP_UNREACHABLE_TYPE, ICMP_PORT_CODE, current_pkt->incoming_interface);
     		holder_pkt = current_pkt;
     		if(!prev_pkt){
-    			printf("b\n");
+
     			/*current_pkt = current_pkt->next;*/
     			nat->unsolicited_pkts = current_pkt->next;
     			current_pkt = current_pkt->next;
     		}else{
-    			printf("a\n");
+
     			prev_pkt->next = current_pkt->next;
     			current_pkt = current_pkt->next;
     		}
     		free(holder_pkt->packet);
     		free(holder_pkt);
     		
-    	}else{
+    	}else if(tcp_hdr->tcp_port_dst < 1024){
+			send_icmp_pkt(nat->sr, current_pkt->len, current_pkt->packet, ICMP_UNREACHABLE_TYPE, ICMP_PORT_CODE, current_pkt->incoming_interface);
+			holder_pkt = current_pkt;
+    		if(!prev_pkt){
+
+    			/*current_pkt = current_pkt->next;*/
+    			nat->unsolicited_pkts = current_pkt->next;
+    			current_pkt = current_pkt->next;
+    		}else{
+
+    			prev_pkt->next = current_pkt->next;
+    			current_pkt = current_pkt->next;
+    		}
+    		free(holder_pkt->packet);
+    		free(holder_pkt);	
+				
+		}else{
     		prev_pkt = current_pkt;
     		current_pkt = current_pkt->next;
     	}
@@ -413,15 +445,6 @@ struct sr_nat_mapping *sr_nat_packet_mapping_lookup(struct sr_instance *sr,
 					new_unsolicited->aux_ext = tcp_hdr->tcp_port_src; 
 					new_unsolicited->next = sr->nat->unsolicited_pkts;
 					sr->nat->unsolicited_pkts = new_unsolicited;
-					/*sr->nat->unsolicited_pkts = (struct sr_unsolicited_pkts *)malloc(sizeof(struct sr_unsolicited_pkts));
-					//sr->nat->unsolicited_pkts->packet = (uint8_t *)malloc(len);
-					//memcpy(sr->nat->unsolicited_pkts->packet, packet, len);
-
-					//sr->nat->unsolicited_pkts->incoming_interface = interface;
-					//sr->nat->unsolicited_pkts->len = len;
-					//sr->nat->unsolicited_pkts->last_updated = time(NULL);
-					//sr->nat->unsolicited_pkts->ip_ext = ip_hdr->ip_src;
-					//sr->nat->unsolicited_pkts->aux_ext = tcp_hdr->tcp_port_src; */
 				}else{
 					printf("not empty que\n");
 					struct sr_unsolicited_pkts *unsolicited_pkts = sr->nat->unsolicited_pkts;
@@ -449,7 +472,7 @@ struct sr_nat_mapping *sr_nat_packet_mapping_lookup(struct sr_instance *sr,
 						sr->nat->unsolicited_pkts = unsolicited_pkt;
 					}
 				}
-				printf("bbbbbbb %x\n", tcp_hdr->tcp_port_src);
+
 				pthread_mutex_unlock(&(sr->nat->lock));
 			  }	
 			}
@@ -463,31 +486,10 @@ struct sr_nat_mapping *sr_nat_packet_mapping_lookup(struct sr_instance *sr,
 			if(mapping == NULL){
 				mapping = sr_nat_insert_mapping(sr->nat, ip_hdr->ip_src, port_number, type);
 			}
-			
-			if(tcp_hdr->tcp_flag == SYN){
-				pthread_mutex_lock(&(sr->nat->lock));
-				struct sr_unsolicited_pkts *unsolicited_pkt = sr->nat->unsolicited_pkts;
-				struct sr_unsolicited_pkts *prev_pkt;
-				struct sr_unsolicited_pkts *holder_pkt;
-				while(unsolicited_pkt){
-					if(unsolicited_pkt->ip_ext == ip_ext && unsolicited_pkt->ip_ext == aux_ext){
-						holder_pkt = unsolicited_pkt;
-						if(!prev_pkt){
-							unsolicited_pkt = unsolicited_pkt->next;
-							sr->nat->unsolicited_pkts = unsolicited_pkt;
-						}else{
-							prev_pkt->next = unsolicited_pkt->next;
-						}
-					}else{
-						prev_pkt = unsolicited_pkt;
-						unsolicited_pkt = unsolicited_pkt->next;
-					}
-				}
-				pthread_mutex_unlock(&(sr->nat->lock));
-			}
 		}
 		
 		if(mapping != NULL){
+			
 			sr_nat_tcp_connection_update(sr, packet, ip_ext, aux_ext, mapping, pkt_dir);
 		}
 			
@@ -563,7 +565,39 @@ void sr_nat_tcp_connection_update(struct sr_instance *sr, uint8_t * packet, uint
 	pthread_mutex_unlock(&(sr->nat->lock));
 }
 
-int sr_nat_modify_packet(struct sr_instance *sr,
+pkt_forwarding_dir sr_nat_get_pkt_dir(struct sr_instance *sr,
+        struct sr_ip_hdr *ip_hdr){
+    int is_src_int = 0;
+	int is_dst_int = 0;
+
+	struct sr_rt *routing_src = sr_rtable_lookup(sr, ip_hdr->ip_src);
+	struct sr_rt *routing_dst = sr_rtable_lookup(sr, ip_hdr->ip_dst);
+
+	if(strcmp(routing_src->interface, "eth1") == 0){
+
+		is_src_int = 1;	
+	}
+	
+	if(strcmp(routing_dst->interface, "eth1") == 0){
+		is_dst_int = 1;
+	}
+	
+	
+	printf("interal src %d, insteral dst %d\n", is_src_int, is_dst_int);
+	
+	if(!is_src_int && (sr_get_nat_interface_ext(sr))->ip == ip_hdr->ip_dst){
+		printf("this is the reply\n");
+		return incoming;
+	}
+
+	if(is_src_int && !is_dst_int){
+		return outgoing;
+	}
+	
+	return int_ext_only;
+}
+
+void sr_nat_modify_packet(struct sr_instance *sr,
         uint8_t * packet/* lent */,
         unsigned int len,
         char* interface/* lent */){
@@ -572,28 +606,17 @@ int sr_nat_modify_packet(struct sr_instance *sr,
 	printf("before incoming finding end\n");
 	pkt_forwarding_dir pkt_dir = sr_nat_get_pkt_dir(sr, ip_hdr);
 	
-	if(pkt_dir == external){
-		printf("external\n");
-		return 0;
+	if(pkt_dir == int_ext_only){
+		printf("external internal\n");
+		return;
 	}
 	
-	if(pkt_dir == internal && ip_hdr->ip_p == ip_protocol_icmp){
-		return 0;
-	}
-	
-	printf("incoming finding end\n");
 	struct sr_nat_mapping *mapping = sr_nat_packet_mapping_lookup(sr, packet, len, interface, pkt_dir);
-	printf("mapping finding end\n");
+
 	
 	if(mapping == NULL){
 		printf("no mapping found\n");
-		if(ip_hdr->ip_p == ip_protocol_icmp){
-			return 0;
-		}
-		if(ip_hdr->ip_p == ip_protocol_tcp){
-
-			return 1;
-		}
+		return;
 	}
 	
 	if(ip_hdr->ip_p == ip_protocol_icmp){
@@ -607,7 +630,7 @@ int sr_nat_modify_packet(struct sr_instance *sr,
 			icmp_hdr->icmp_id = mapping->aux_int;		
 		}else if(pkt_dir == outgoing){
 			printf("outgoing\n");
-			printf("port %x\n", mapping->aux_ext);
+
 			ip_hdr->ip_src = mapping->ip_ext;
 			icmp_hdr->icmp_id = mapping->aux_ext;
 		}
@@ -640,48 +663,10 @@ int sr_nat_modify_packet(struct sr_instance *sr,
 	ip_hdr->ip_sum = cksum(ip_hdr, ip_hdr->ip_hl*4);
 	
 	free(mapping);
-	return 0;
+	return;
 
 }
 
-pkt_forwarding_dir sr_nat_get_pkt_dir(struct sr_instance *sr,
-        struct sr_ip_hdr *ip_hdr){
-    int is_src_int = 0;
-	int is_dst_int = 0;
-	struct sr_rt *routing_src = sr_rtable_lookup(sr, ip_hdr->ip_src);
-	if(!routing_src){
-		is_src_int = -1;
-	}else{
-		if(strncmp(routing_src->interface, "eth1", 4) == 0){
 
-			is_src_int = 1;
-		}
-	}
-	struct sr_rt *routing_dst = sr_rtable_lookup(sr, ip_hdr->ip_dst);
-	if(!routing_dst){
-		is_dst_int = -1;
-	}else{
-		if(strncmp(routing_dst->interface, "eth1", 4) == 0){
-			is_dst_int = 1;
-		}
-	}
-	
-	printf("interal src %d, insteral dst %d\n", is_src_int, is_dst_int);
-	if(is_src_int && is_dst_int < 0){
-		printf("interal\n");
-		return internal;
-	}
-	
-	struct sr_if *ext_if = sr_get_nat_interface_ext(sr);
-	if(!is_src_int && ext_if->ip == ip_hdr->ip_dst){
-		printf("this is the icmp reply\n");
-		return incoming;
-	}
-	if(is_src_int && ext_if->ip != ip_hdr->ip_dst){
-		return outgoing;
-	}
-	
-	return external;
-}
 
 
