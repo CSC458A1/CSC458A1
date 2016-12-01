@@ -34,8 +34,7 @@ int sr_nat_init(struct sr_nat *nat) { /* Initializes the nat */
 
   nat->mappings = NULL;
   /* Initialize any variables here */
-  nat->last_assigned_aux = 1024;
-  nat->unsolicited_pkts = NULL;
+  nat->last_assigned_aux = 1023;
   return success;
 }
 
@@ -429,7 +428,7 @@ struct sr_nat_mapping *sr_nat_packet_mapping_lookup(struct sr_instance *sr,
 			printf("incoming port %x\n", port_number);
 			mapping = sr_nat_lookup_external(sr->nat, port_number, type);
 			if(mapping == NULL){
-			  if(tcp_hdr->tcp_flag & SYN){
+			  if(tcp_hdr->tcp_flag == SYN){
                   if (htons(tcp_hdr->tcp_port_dst) < 1024) {
                       send_icmp_pkt(sr, len, packet, ICMP_UNREACHABLE_TYPE, ICMP_PORT_CODE, interface);
                   } else {
@@ -444,36 +443,19 @@ struct sr_nat_mapping *sr_nat_packet_mapping_lookup(struct sr_instance *sr,
 					new_unsolicited->incoming_interface = interface;
 					new_unsolicited->len= len;
 					new_unsolicited->last_updated = time(NULL);
-					new_unsolicited->ip_ext = ip_hdr->ip_src;
-					new_unsolicited->aux_ext = tcp_hdr->tcp_port_src; 
 					new_unsolicited->next = sr->nat->unsolicited_pkts;
 					sr->nat->unsolicited_pkts = new_unsolicited;
 				}else{
 					printf("not empty que\n");
 					struct sr_unsolicited_pkts *unsolicited_pkts = sr->nat->unsolicited_pkts;
-					struct sr_unsolicited_pkts *same_pkt;
-					while(unsolicited_pkts){
-						if(unsolicited_pkts->ip_ext == ip_ext && 
-							unsolicited_pkts->aux_ext == aux_ext){
-							printf("got a same one\n");
-							same_pkt = unsolicited_pkts;
-						}
-						unsolicited_pkts = unsolicited_pkts->next;
-					}
-					if(!same_pkt){
-					
-						struct sr_unsolicited_pkts *unsolicited_pkt = (struct sr_unsolicited_pkts *)malloc(sizeof(struct sr_unsolicited_pkts));
-						unsolicited_pkt->packet = (uint8_t *)malloc(len);
-						memcpy(unsolicited_pkt->packet, packet, len);
-
-						unsolicited_pkt->incoming_interface = interface;
-						unsolicited_pkt->len = len;
-						unsolicited_pkt->last_updated = time(NULL);
-						unsolicited_pkt->ip_ext = ip_hdr->ip_src;
-						unsolicited_pkt->aux_ext = tcp_hdr->tcp_port_src;
-						unsolicited_pkt->next = sr->nat->unsolicited_pkts;
-						sr->nat->unsolicited_pkts = unsolicited_pkt;
-					}
+					struct sr_unsolicited_pkts *unsolicited_pkt = (struct sr_unsolicited_pkts *)malloc(sizeof(struct sr_unsolicited_pkts));
+					unsolicited_pkt->packet = (uint8_t *)malloc(len);
+					memcpy(unsolicited_pkt->packet, packet, len);
+					unsolicited_pkt->incoming_interface = interface;
+					unsolicited_pkt->len = len;
+					unsolicited_pkt->last_updated = time(NULL);
+					unsolicited_pkt->next = sr->nat->unsolicited_pkts;
+					sr->nat->unsolicited_pkts = unsolicited_pkt;
 				}
 
 				pthread_mutex_unlock(&(sr->nat->lock));
@@ -508,24 +490,23 @@ void sr_nat_tcp_connection_update(struct sr_instance *sr, uint8_t * packet, uint
 
 	pthread_mutex_lock(&(sr->nat->lock));
 	struct sr_nat_mapping *mappings = sr->nat->mappings;
-
+	struct sr_nat_connection *conns = NULL;
+	struct sr_nat_connection *conn = NULL;
 	while(mappings){
 		if(mappings->type == mapping-> type && mappings->aux_int == mapping->aux_int && 
 			mappings->ip_int == mapping->ip_int){
 			mapping = mappings;
+			conns = mapping->conns;
+			while(conns){
+				if(conns->aux_ext == aux_ext && conns->ip_ext == ip_ext){
+					conn = conns;
+					break;
+				}
+				conns = conns->next;
+			}
 			break;
 		}
 		mappings = mappings->next;
-	}
-	
-	struct sr_nat_connection *conns = mapping->conns;
-	struct sr_nat_connection *conn = NULL;
-	while(conns){
-		if(conns->aux_ext == aux_ext && conns->ip_ext == ip_ext){
-			conn = conns;
-			break;
-		}
-		conns = conns->next;
 	}
 	
 	if(!conn){
@@ -556,7 +537,7 @@ void sr_nat_tcp_connection_update(struct sr_instance *sr, uint8_t * packet, uint
 		}
 	}
 	
-	if(pkt_dir == incoming){
+	if(pkt_dir == outgoing){
 		if(tcp_hdr->tcp_flag == SYN){
 			conn->INT_SYN = 1;
 		}
